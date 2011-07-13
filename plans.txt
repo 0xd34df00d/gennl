@@ -1,0 +1,12 @@
+Non-linear autoregression models generation.
+
+* Refresh group theory, familiarize with basics of category theory.
+* Read given chapters of McCay (28), Bishop (5), others.
+* Begin trying to build a representation of models combinators as group
+  operation over a set of NLAMs.
+
+Global:
+* Build an algorithm for generating models less than or equal to the
+  given complexity (defined as the number of neurons).
+* Computing and representing hyperparams of neural nets.
+* Computing and interpreting likelyhood.
