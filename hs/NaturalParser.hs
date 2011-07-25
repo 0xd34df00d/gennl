@@ -1,6 +1,9 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 module NaturalParser
+    (
+        parseStr
+    )
     where
 
 import Text.Parsec
@@ -8,6 +11,8 @@ import Text.Parsec.Expr
 import Text.Parsec.Char
 import qualified Text.Parsec.Token as P
 import Text.Parsec.Language (emptyDef)
+
+import ExprTree
 
 parseStr = parse expr ""
 
@@ -33,16 +38,17 @@ float = P.float lexer
 natural = P.natural lexer
 symbol = P.symbol lexer
 reservedOp = P.reservedOp lexer
+
 term = parens expr
-    <|> try float
-    <|> try (natural >>= \h -> return (fromInteger h))
+    <|> try (float >>= \f -> return (LeafConst f))
+    <|> try (natural >>= \h -> return (LeafConst $ fromInteger h))
     <?> "term (simple expr)"
 
 table = [
-          [prefix "-" negate, prefix "+" id]
-        , [prefix "sin" sin, prefix "cos" cos]
-        , [binary "*" (*) AssocLeft, binary "/" (/) AssocLeft]
-        , [binary "+" (+) AssocLeft, binary "-" (-) AssocLeft]
+            [prefix "-" (NodeBinary Minus (LeafConst 0.0)), prefix "+" id],
+            [prefix "sin" (NodeUnary Sin), prefix "cos" (NodeUnary Cos)],
+            [binary "*" (NodeBinary Mul) AssocLeft, binary "/" (NodeBinary Div) AssocLeft],
+            [binary "+" (NodeBinary Plus) AssocLeft, binary "-" (NodeBinary Minus) AssocLeft]
         ]
 
 binary s f = Infix ( reservedOp s >> return f <?> "binary operator")
