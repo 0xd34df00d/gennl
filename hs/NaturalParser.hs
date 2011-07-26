@@ -8,11 +8,10 @@ module NaturalParser
 
 import Text.Parsec
 import Text.Parsec.Expr
-import Text.Parsec.Char
 import qualified Text.Parsec.Token as P
 import Text.Parsec.Language (emptyDef)
-
 import ExprTree
+import SupportUtils
 
 parseStr = parse expr ""
 
@@ -26,7 +25,7 @@ mathExprDef = emptyDef {
         P.identLetter = letter <|> digit <|> char '_',
         P.opStart = oneOf ":!#$%&*+./<=>?@\\^|-~",
         P.opLetter = oneOf ":!#$%&*+./<=>?@\\^|-~",
-        P.reservedOpNames = ["+", "-", "*", "/", "sin", "cos", "pow"]
+        P.reservedOpNames = ["+", "-", "*", "/", "sin", "cos", "^"]
     }
 
 -- Generate the lexer
@@ -36,7 +35,6 @@ lexer = P.makeTokenParser mathExprDef
 parens = P.parens lexer
 float = P.float lexer
 natural = P.natural lexer
-symbol = P.symbol lexer
 reservedOp = P.reservedOp lexer
 identifier = P.identifier lexer
 
@@ -49,6 +47,7 @@ term = parens expr
 table = [
             [prefix' "-" negate', prefix' "+" id],
             [prefix "sin", prefix "cos"],
+            [binary "^" AssocRight],
             [binary "*" AssocLeft, binary "/" AssocLeft],
             [binary "+" AssocLeft, binary "-" AssocLeft]
         ]
@@ -59,8 +58,7 @@ prefix' s f = Prefix ( reservedOp s >> return f <?> "unary prefix operator")
 
 stdF ar g s = case g s of
         Just x -> ar s x
-        Nothing -> undefined
+        Nothing -> failStr $ "Got nothing for " ++ show s
 
 prefix = stdF prefix' unaryNode
 binary = stdF binary' binaryNode
-
