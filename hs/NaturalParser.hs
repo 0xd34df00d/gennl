@@ -38,10 +38,12 @@ float = P.float lexer
 natural = P.natural lexer
 symbol = P.symbol lexer
 reservedOp = P.reservedOp lexer
+identifier = P.identifier lexer
 
 term = parens expr
     <|> try (float >>= \f -> return (LeafConst f))
     <|> try (natural >>= \h -> return (LeafConst $ fromInteger h))
+    <|> try (identifier >>= \s -> return (LeafVar $ Var s))
     <?> "term (simple expr)"
 
 table = [
