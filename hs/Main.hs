@@ -4,8 +4,9 @@ import ExprTree
 import NaturalParser
 import ExprIncidenceMatrix
 
-simplified str = case parseStr str of
-        Right tree -> Right $ simplifyStab tree
-        Left err -> Left err
+applyP f s = case parseStr s of
+        Right t -> Right $ f t
+        Left e -> Left e
 
-
+simplified s = applyP simplifyStab s
+incMatrix s = applyP toIncMatrix s

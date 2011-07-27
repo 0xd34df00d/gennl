@@ -15,7 +15,7 @@ module ExprTree
     )
     where
 
-import Control.Monad (liftM)
+import Data.Functor ((<$>))
 import SupportUtils
 
 type Const = Double
@@ -44,10 +44,10 @@ realLeaf = LeafConst
 
 varLeaf = LeafVar . Var
 
-unaryNode s = NodeUnary `liftM` lookup s al 
+unaryNode s = NodeUnary <$> lookup s al 
     where al = [ ("sin", Sin), ("cos", Cos), ("log", Log) ]
 
-binaryNode s = NodeBinary `liftM` lookup s al
+binaryNode s = NodeBinary <$> lookup s al
     where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
 
 -- Better to place terminating optimizations at the top, obviously

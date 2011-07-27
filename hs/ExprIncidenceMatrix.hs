@@ -16,13 +16,10 @@ data IncMatrix = IncMatrix {
     }
     deriving (Show)
 
-toIncMatrix :: ExprTree -> IncMatrix
-toIncMatrix = undefined
-
 data VecState = VecState {
-        pos :: Integer,
+        pos :: Int,
         nodesList :: [NodeType],
-        prevNodes :: [Integer]
+        prevNodes :: [Int]
     }
     deriving (Show)
 
@@ -36,7 +33,15 @@ vecTree t = st { nodesList = reverse $ nodesList st, prevNodes = reverse $ prevN
 
 vecTree' st (LeafVar (Var v)) = st |++| LeafTNode v
 vecTree' st (LeafConst c) = st |++| LeafCNode c
-vecTree' st (NodeUnary f r) = vecTree' (st |++| UnNode f |++-| (pos st)) r
+vecTree' st (NodeUnary f r) = vecTree' (st |++| UnNode f |++-| pos st) r
 vecTree' st (NodeBinary f l r) = vecTree' (st' |++-| b) r
     where st' = vecTree' (st |++| BinNode f |++-| b) l
           b = pos st
+
+toIncMatrix t = IncMatrix (buildMatrix b (b - 1) f) (nodesList st)
+    where st = vecTree t
+          pn = prevNodes st
+          b = pos st
+          f (i, j) | i == j + 1 = 1
+                   | pn !! j == i = 1
+                   | otherwise = 0
