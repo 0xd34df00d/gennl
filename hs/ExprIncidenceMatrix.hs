@@ -12,7 +12,7 @@ data NodeType = BinNode BinaryFunc
 
 data IncMatrix = IncMatrix {
         numMatrix :: Matrix Double,
-        opVec :: [NodeType]
+        ops :: [NodeType]
     }
     deriving (Show)
 
@@ -40,8 +40,7 @@ vecTree' st (NodeBinary f l r) = vecTree' (st' |++-| b) r
 
 toIncMatrix t = IncMatrix (buildMatrix b (b - 1) f) (nodesList st)
     where st = vecTree t
-          pn = prevNodes st
           b = pos st
           f (i, j) | i == j + 1 = 1
-                   | pn !! j == i = 1
+                   | prevNodes st !! j == i = 1
                    | otherwise = 0

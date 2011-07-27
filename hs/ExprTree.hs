@@ -1,18 +1,4 @@
 module ExprTree
-    (
-        ExprTree(..),
-        UnaryFunc(..),
-        BinaryFunc(..),
-        Var(..),
-        Const,
-        intLeaf,
-        realLeaf,
-        varLeaf,
-        unaryNode,
-        binaryNode,
-        simplifyTree,
-        simplifyStab
-    )
     where
 
 import Data.Functor ((<$>))
