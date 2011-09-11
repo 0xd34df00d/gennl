@@ -63,7 +63,7 @@ instance GAble IncMatrix where
 nRands :: (RandomGen g, Random a) => g -> Int -> ([a], g)
 nRands g n = foldl' step ([], g) [1..n]
     where step (l, g') _ = (fst p : l, snd p)
-          p = random g
+            where p = random g'
 
 randElem :: [a] -> Double -> a
 randElem xs r = xs !! floor (r * fromIntegral (length xs))
