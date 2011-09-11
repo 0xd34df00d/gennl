@@ -1,5 +1,3 @@
-{-# LANGUAGE NoMonomorphismRestriction #-}
-
 module Genetic
     where
 
@@ -64,8 +62,8 @@ instance GAble IncMatrix where
 -- Utility stuff
 nRands :: (RandomGen g, Random a) => g -> Int -> ([a], g)
 nRands g n = foldl' step ([], g) [1..n]
-    where step (l, g') _ = (fst pair : l, snd pair)
-          pair = random g
+    where step (l, g') _ = (fst p : l, snd p)
+          p = random g
 
 randElem :: [a] -> Double -> a
 randElem xs r = xs !! floor (r * fromIntegral (length xs))
