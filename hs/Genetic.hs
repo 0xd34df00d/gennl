@@ -28,7 +28,7 @@ data RandomGen g => GAState g a = GAState {
         fits :: [(a, Double)]
     }
 
-class GAble a where
+class Eq a => GAble a where
     mutate :: RandomGen g => GAState g a -> a -> (a, GAState g a)
     crossover :: RandomGen g => GAState g a -> (a, a) -> (a, a, GAState g a)
     compute :: [(String, Double)] -> a -> Double
@@ -50,6 +50,19 @@ iterateGA = execState chain
 
 tickGA :: RandomGen g => State (GAState g a) ()
 tickGA = get >>= (\st -> put $ st { iter = iter st + 1 } )
+
+assessPpl :: (GAble a, RandomGen g) => State (GAState g a) ()
+assessPpl = do
+        st <- get
+        let ppls = ppl st
+        put st { fits = zip ppls (map (getFit st) ppls) }
+    where getFit st a | Just x <- lookup a (fits st) = x
+                      | otherwise = getChromoFit a st
+
+getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> Double
+getChromoFit a st = 1 / foldl' step 1 (testSet c)
+    where step s smp = s + abs (snd smp - compute (zip (vars c) (fst smp)) a)
+          c = cfg st
 
 runGA :: (RandomGen g, GAble a) => GAState g a -> a
 runGA st = if stopF (cfg st) (ppl st) (iter st) maxFitness
