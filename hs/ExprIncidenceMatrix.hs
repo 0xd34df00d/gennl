@@ -12,15 +12,17 @@ data NodeType = BinNode BinaryFunc
                 | UnNode UnaryFunc
                 | LeafCNode Const
                 | LeafTNode String
-    deriving (Show)
+    deriving (Show, Eq)
 
 type NumMatrix = Matrix Double
+
+instance Eq a => Eq (Matrix a)
 
 data IncMatrix = IncMatrix {
         numMat :: NumMatrix,
         ops :: [NodeType]
     }
-    deriving (Show)
+    deriving (Show, Eq)
 
 data VecState = VecState {
         pos :: Int,
