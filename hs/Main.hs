@@ -5,9 +5,10 @@ import NaturalParser
 import ExprIncidenceMatrix
 import Genetic
 
-applyP f s = case parseStr s of
+applyP f s = case s of
         Right t -> Right $ f t
         Left e -> Left e
+applyP' f s = applyP f $ parseStr s
 
-simplified s = applyP simplifyStab s
-incMatrix s = applyP toIncMatrix s
+simplified s = applyP' simplifyStab s
+incMatrix s = applyP' toIncMatrix s
