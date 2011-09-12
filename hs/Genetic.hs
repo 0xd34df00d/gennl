@@ -48,7 +48,8 @@ iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
     where chain = tickGA >>
                     assessPpl >>
-                    cleanupFits
+                    cleanupFits >>
+                    sortPpl
 
 type MGState g a = State (GAState g a) ()
 
@@ -67,6 +68,9 @@ getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> Double
 getChromoFit a st = 1 / foldl' step 1 (testSet c)
     where step s smp = s + abs (snd smp - compute (zip (vars c) (fst smp)) a)
           c = cfg st
+
+sortPpl :: (RandomGen g, GAble a) => MGState g a
+sortPpl = get >>= (\st -> put $ st { ppl = map fst $ sortBy (comparing snd) (fits st) } )
 
 cleanupFits :: (RandomGen g, GAble a) => MGState g a
 cleanupFits = get >>=
