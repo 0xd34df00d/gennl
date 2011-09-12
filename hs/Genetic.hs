@@ -5,6 +5,7 @@ import Control.Monad.State
 import Control.Arrow
 import Data.Packed.Matrix
 import Data.List
+import Data.Ord (comparing)
 import Random
 import ExprTree
 import ExprIncidenceMatrix
@@ -20,11 +21,11 @@ data GAConfig a = GAConfig {
     }
 
 data RandomGen g => GAState g a = GAState {
-        config :: GAConfig a,
+        cfg :: GAConfig a,
         randGen :: g,
         iter :: Int,
-        population :: [a],
-        knownFitnesses :: [(a, Double)]
+        ppl :: [a],
+        fits :: [(a, Double)]
     }
 
 class GAble a where
@@ -50,15 +51,21 @@ iterateGA = execState chain
 tickGA :: RandomGen g => State (GAState g a) ()
 tickGA = get >>= (\st -> put $ st { iter = iter st + 1 } )
 
+runGA :: (RandomGen g, GAble a) => GAState g a -> a
+runGA st = if stopF (cfg st) (ppl st) (iter st) maxFitness
+            then best
+            else runGA $ iterateGA st
+    where (best, maxFitness) = maximumBy (comparing snd) (fits st)
+
 instance GAble IncMatrix where
     mutate st m = (m', st')
         where (t1:t2:t3:_, gen) = nRands (randGen st) 3
               opIdx = floor $ fromIntegral (rows (numMat m) + 1) * t1
               newOp = case ops m !! opIdx of
-                    LeafCNode _ -> leafMutate (t2, t3) (config st)
-                    LeafTNode _ -> leafMutate (t2, t3) (config st)
-                    UnNode f -> unaryMutate t2 (config st)
-                    BinNode f -> binaryMutate t2 (config st)
+                    LeafCNode _ -> leafMutate (t2, t3) (cfg st)
+                    LeafTNode _ -> leafMutate (t2, t3) (cfg st)
+                    UnNode f -> unaryMutate t2 (cfg st)
+                    BinNode f -> binaryMutate t2 (cfg st)
               m' = m { ops = replaceElem (ops m) opIdx newOp }
               st' = st { randGen = gen }
               leafMutate (t1, t2) c | t1 >= 0.5 = LeafCNode $ t2 * 100
