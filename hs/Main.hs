@@ -4,6 +4,7 @@ import ExprTree
 import NaturalParser
 import ExprIncidenceMatrix
 import Genetic
+import CSVParser
 
 applyP f s = case s of
         Right t -> Right $ f t
