@@ -55,8 +55,8 @@ instance GAble IncMatrix where
               m2' = swap'' (m2, p2) (m1, p1)
               st' = st { randGen = gen }
               swap'' (m1, p1) (m2, p2) = replaceSubMat (p1 `mod` m1s) (subTreeMat (p2 `mod` m2s) m2) m1
-                    where m1s = undefined
-                          m2s = undefined
+                    where m1s = cols $ numMat m1
+                          m2s = cols $ numMat m2
     compute = evalMatrix
 
 -- Utility stuff
