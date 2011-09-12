@@ -46,12 +46,16 @@ initGA c g as = GAState c g 0 as []
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
-    where chain = tickGA
+    where chain = tickGA >>
+                    assessPpl >>
+                    cleanupFits
 
-tickGA :: RandomGen g => State (GAState g a) ()
+type MGState g a = State (GAState g a) ()
+
+tickGA :: RandomGen g => MGState g a
 tickGA = get >>= (\st -> put $ st { iter = iter st + 1 } )
 
-assessPpl :: (GAble a, RandomGen g) => State (GAState g a) ()
+assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
         st <- get
         let ppls = ppl st
@@ -63,6 +67,10 @@ getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> Double
 getChromoFit a st = 1 / foldl' step 1 (testSet c)
     where step s smp = s + abs (snd smp - compute (zip (vars c) (fst smp)) a)
           c = cfg st
+
+cleanupFits :: (RandomGen g, GAble a) => MGState g a
+cleanupFits = get >>=
+    (\st -> when (length (ppl st) /= length (fits st)) $ put $ st { fits = filter ((`elem` ppl st) . fst) (fits st) } )
 
 runGA :: (RandomGen g, GAble a) => GAState g a -> a
 runGA st = if stopF (cfg st) (ppl st) (iter st) maxFitness
