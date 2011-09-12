@@ -28,7 +28,7 @@ data GAState a = GAState {
 class GAble a where
     mutate :: GAState a -> a -> (a, GAState a)
     crossover :: GAState a -> (a, a) -> (a, a, GAState a)
-    compute :: a -> [(String, Double)] -> Double
+    compute :: [(String, Double)] -> a -> Double
 
 iterateGA :: (GAble a) => GAState a -> GAState a
 iterateGA st = st'
