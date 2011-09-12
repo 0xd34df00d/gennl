@@ -9,30 +9,43 @@ import Random
 import ExprTree
 import ExprIncidenceMatrix
 
+type TestSample = ([Double], Double)
+
 data GAConfig a = GAConfig {
         unaryOpsPool :: [UnaryFunc],
         binaryOpsPool :: [BinaryFunc],
         vars :: [String],
-        fitF :: a -> Double,
-        stopF :: [a] -> Int -> Double -> Bool,
-        leaveF :: [(Double, a)] -> [(Double, a)] -> [a]
+        testSet :: [TestSample],                     -- The order of doubles should be the same as in vars.
+        stopF :: [a] -> Int -> Double -> Bool
     }
 
-data GAState a = GAState {
+data RandomGen g => GAState g a = GAState {
         config :: GAConfig a,
-        randGen :: StdGen,
+        randGen :: g,
         iter :: Int,
-        population :: [a]
+        population :: [a],
+        knownFitnesses :: [(a, Double)]
     }
 
 class GAble a where
-    mutate :: GAState a -> a -> (a, GAState a)
-    crossover :: GAState a -> (a, a) -> (a, a, GAState a)
+    mutate :: RandomGen g => GAState g a -> a -> (a, GAState g a)
+    crossover :: RandomGen g => GAState g a -> (a, a) -> (a, a, GAState g a)
     compute :: [(String, Double)] -> a -> Double
 
-iterateGA :: (GAble a) => GAState a -> GAState a
+defConfig :: (GAble a) => GAConfig a
+defConfig = GAConfig
+                (map fst unaryOps)
+                (map fst binaryOps)
+                []
+                []
+                (\_ its maxF -> its > 1000 || maxF > 0.95)
+
+initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> [a] -> GAState g a
+initGA c g as = GAState c g 0 as []
+
+iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA st = st'
-    where st' = undefined
+    where st' = st { iter = iter st + 1 }
 
 instance GAble IncMatrix where
     mutate st m = (m', st')
@@ -50,7 +63,7 @@ instance GAble IncMatrix where
               unaryMutate t1 c = UnNode $ randElem (unaryOpsPool c) t1
               binaryMutate t1 c = BinNode $ randElem (binaryOpsPool c) t1
     crossover st (m1, m2) = (m1', m2', st')
-        where (p1:p2:_, gen) = nRands (randGen st) 2 :: ([Int], StdGen)
+        where (p1:p2:_, gen) = nRands (randGen st) 2
               m1' = swap'' (m1, p1) (m2, p2)
               m2' = swap'' (m2, p2) (m1, p1)
               st' = st { randGen = gen }
