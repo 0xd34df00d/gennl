@@ -38,8 +38,9 @@ evalMatrix vals (IncMatrix _ ops) = head $ foldr step [] ops
                                   | otherwise = error $ "Unknown variable " ++ var ++ ", supplied varmap: " ++ show vals
           step (UnNode f) st | Just f' <- lookup f unaryOps = init st ++ [f' $ last st]
                              | otherwise = error $ "Unknown unary function " ++ show f
-          step (BinNode f) st | Just f' <- lookup f binaryOps = (init . init) st ++ [f' ((last . init) st) (last st)]
+          step (BinNode f) st | Just f' <- lookup f binaryOps = init st' ++ [f' (last st) (last st')]
                               | otherwise = error $ "Unknown binary function " ++ show f
+                where st' = init st
 
 (|++|) st n = st { nodesList = n : nodesList st, pos = pos st + 1 }
 (|++-|) st b = st { prevNodes = b : prevNodes st }
