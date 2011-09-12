@@ -44,8 +44,11 @@ initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> [a] -> GAState g a
 initGA c g as = GAState c g 0 as []
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
-iterateGA st = st'
-    where st' = st { iter = iter st + 1 }
+iterateGA = execState chain
+    where chain = tickGA
+
+tickGA :: RandomGen g => State (GAState g a) ()
+tickGA = get >>= (\st -> put $ st { iter = iter st + 1 } )
 
 instance GAble IncMatrix where
     mutate st m = (m', st')
