@@ -7,6 +7,9 @@ import Data.Packed.Matrix
 import Data.Packed.Vector
 import ExprTree
 import Debug.Trace
+import SupportUtils
+import Random
+import Control.Arrow
 
 data NodeType = BinNode BinaryFunc
                 | UnNode UnaryFunc
@@ -63,6 +66,9 @@ toIncMatrix t = IncMatrix (buildMatrix b (b - 1) f) (nodesList st)
           f (i, j) | i == j + 1 = 1
                    | prevNodes st !! j == i = 1
                    | otherwise = 0
+
+randIncMatrix :: (RandomGen g) => [String] -> g -> (IncMatrix, g)
+randIncMatrix vars = first toIncMatrix . randExprTree vars
 
 replaceSubMat :: Int -> IncMatrix -> IncMatrix -> IncMatrix
 replaceSubMat pos sub m = insertSubMat pos sub $ removeSubMat (pos, subTreeEndIdx (numMat m) pos) m

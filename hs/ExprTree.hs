@@ -1,23 +1,31 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module ExprTree
     where
 
 import Data.Functor ((<$>))
 import SupportUtils
+import Random
+import Control.Arrow
 
 type Const = Double
 
 data Var = Var String
     deriving (Show, Eq)
 
+data UnaryFunc = Sin | Cos | Log
+    deriving (Show, Eq)
+
 unaryOps = [ (Sin, sin), (Cos, cos), (Log, log) ]
 
-data UnaryFunc = Sin | Cos | Log
+unaryOpsOnly = map fst unaryOps
+
+data BinaryFunc = Plus | Minus | Mul | Div | Pow
     deriving (Show, Eq)
 
 binaryOps = [ (Plus, (+)), (Minus, (-)), (Mul, (*)), (Div, (/)), (Pow, (**)) ]
 
-data BinaryFunc = Plus | Minus | Mul | Div | Pow
-    deriving (Show, Eq)
+binaryOpsOnly = map fst binaryOps
 
 data ExprTree = NodeUnary UnaryFunc ExprTree
                 | NodeBinary BinaryFunc ExprTree ExprTree
@@ -35,6 +43,23 @@ unaryNode s = NodeUnary <$> lookup s al
 
 binaryNode s = NodeBinary <$> lookup s al
     where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
+
+randExprTree :: (RandomGen g) => [String] -> g -> (ExprTree, g)
+randExprTree vars g | dice < 0.12 = (LeafConst (dice * 50), g0)
+                    | dice < 0.30 = (LeafVar $ Var $ randElem vars g2, g0)
+                    | dice < 0.60 = (NodeUnary
+                                        (randElem unaryOpsOnly g2)
+                                        (fst $ randExprTree vars g3),
+                                    g0)
+                    | otherwise = (NodeBinary
+                                        (randElem binaryOpsOnly g2)
+                                        (fst $ randExprTree vars g3)
+                                        (fst $ randExprTree vars g4),
+                                    g0)
+    where (dice :: Double, _) = random g1
+          ((g0, g1), g2') = (first split . split) g
+          ((g2, g3), g4) = (first split . split) g2'
+          randElem xs g = xs !! fst (randomR (0, length xs - 1) g)
 
 -- Better to place terminating optimizations at the top, obviously
 simplifyTree :: ExprTree -> ExprTree

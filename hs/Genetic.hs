@@ -2,13 +2,13 @@ module Genetic
     where
 
 import Control.Monad.State
-import Control.Arrow
 import Data.Packed.Matrix
 import Data.List
 import Data.Ord (comparing)
 import Random
 import ExprTree
 import ExprIncidenceMatrix
+import SupportUtils
 
 type TestSample = ([Double], Double)
 
@@ -32,6 +32,7 @@ class Eq a => GAble a where
     mutate :: RandomGen g => GAState g a -> a -> (a, GAState g a)
     crossover :: RandomGen g => GAState g a -> (a, a) -> (a, a, GAState g a)
     compute :: [(String, Double)] -> a -> Double
+    randGAInst :: RandomGen g => [String] -> g -> (a, g)
 
 defConfig :: (GAble a) => GAConfig a
 defConfig = GAConfig
@@ -43,6 +44,10 @@ defConfig = GAConfig
 
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> [a] -> GAState g a
 initGA c g as = GAState c g 0 as []
+
+initPpl :: (RandomGen g, GAble a) => Int -> GAState g a -> GAState g a
+initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars $ cfg st)) g1, randGen = g2 }
+    where (g1, g2) = split $ randGen st
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
@@ -106,12 +111,9 @@ instance GAble IncMatrix where
                     where m1s = cols $ numMat m1
                           m2s = cols $ numMat m2
     compute = evalMatrix
+    randGAInst = randIncMatrix
 
 -- Utility stuff
-nRands :: (RandomGen g, Random a) => g -> Int -> ([a], g)
-nRands g n = (take n $ unfoldr (Just . random) g1, g2)
-    where (g1, g2) = split g
-
 randElem :: [a] -> Double -> a
 randElem xs r = xs !! floor (r * fromIntegral (length xs))
 

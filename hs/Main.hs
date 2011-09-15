@@ -13,3 +13,4 @@ applyP' f s = applyP f $ parseStr s
 
 simplified s = applyP' simplifyStab s
 incMatrix s = applyP' toIncMatrix s
+

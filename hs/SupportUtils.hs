@@ -3,12 +3,15 @@
 module SupportUtils
     (
         TextableException,
-        failStr
+        failStr,
+        nRands
     )
     where
 
 import Control.Exception
 import Data.Typeable
+import Data.List
+import Random
 
 data TextableException = TextableException String
     deriving (Typeable)
@@ -19,3 +22,7 @@ instance Show TextableException where
 instance Exception TextableException
 
 failStr str = throw $ TextableException str
+
+nRands :: (RandomGen g, Random a) => g -> Int -> ([a], g)
+nRands g n = (take n $ unfoldr (Just . random) g1, g2)
+    where (g1, g2) = split g
