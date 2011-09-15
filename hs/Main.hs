@@ -5,6 +5,7 @@ import NaturalParser
 import ExprIncidenceMatrix
 import Genetic
 import CSVParser
+import Random
 
 applyP f s = case s of
         Right t -> Right $ f t
@@ -14,3 +15,10 @@ applyP' f s = applyP f $ parseStr s
 simplified s = applyP' simplifyStab s
 incMatrix s = applyP' toIncMatrix s
 
+runStuff g = show $ ppl defGA
+    where defGA = initPpl 10 $ initGA (cfg { vars = ["x", "y"] } ) g
+          cfg = defConfig :: GAConfig IncMatrix
+
+main = do
+    g <- newStdGen
+    return $ runStuff g

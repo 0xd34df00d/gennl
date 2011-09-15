@@ -42,8 +42,8 @@ defConfig = GAConfig
                 []
                 (\_ its maxF -> its > 1000 || maxF > 0.95)
 
-initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> [a] -> GAState g a
-initGA c g as = GAState c g 0 as []
+initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
+initGA c g = GAState c g 0 [] []
 
 initPpl :: (RandomGen g, GAble a) => Int -> GAState g a -> GAState g a
 initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars $ cfg st)) g1, randGen = g2 }

@@ -45,17 +45,20 @@ binaryNode s = NodeBinary <$> lookup s al
     where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
 
 randExprTree :: (RandomGen g) => [String] -> g -> (ExprTree, g)
-randExprTree vars g | dice < 0.12 = (LeafConst (dice * 50), g0)
-                    | dice < 0.30 = (LeafVar $ Var $ randElem vars g2, g0)
-                    | dice < 0.60 = (NodeUnary
-                                        (randElem unaryOpsOnly g2)
-                                        (fst $ randExprTree vars g3),
-                                    g0)
-                    | otherwise = (NodeBinary
-                                        (randElem binaryOpsOnly g2)
-                                        (fst $ randExprTree vars g3)
-                                        (fst $ randExprTree vars g4),
-                                    g0)
+randExprTree vars g = randExprTree' vars g False
+
+randExprTree' :: (RandomGen g) => [String] -> g -> Bool -> (ExprTree, g)
+randExprTree' vars g init | init && dice < 0.12 = (LeafConst (dice * 50), g0)
+                          | init && dice < 0.30 = (LeafVar $ Var $ randElem vars g2, g0)
+                          | dice < 0.60 = (NodeUnary
+                                              (randElem unaryOpsOnly g2)
+                                              (fst $ randExprTree' vars g3 True),
+                                           g0)
+                          | otherwise = (NodeBinary
+                                              (randElem binaryOpsOnly g2)
+                                              (fst $ randExprTree' vars g3 True)
+                                              (fst $ randExprTree' vars g4 True),
+                                           g0)
     where (dice :: Double, _) = random g1
           ((g0, g1), g2') = (first split . split) g
           ((g2, g3), g4) = (first split . split) g2'
