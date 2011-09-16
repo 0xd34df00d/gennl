@@ -7,6 +7,7 @@ import Data.Functor ((<$>))
 import SupportUtils
 import Random
 import Control.Arrow
+import Data.List
 
 type Const = Double
 
@@ -48,20 +49,19 @@ randExprTree :: (RandomGen g) => [String] -> g -> (ExprTree, g)
 randExprTree vars g = randExprTree' vars g False
 
 randExprTree' :: (RandomGen g) => [String] -> g -> Bool -> (ExprTree, g)
-randExprTree' vars g init | init && dice < 0.12 = (LeafConst (dice * 50), g0)
-                          | init && dice < 0.30 = (LeafVar $ Var $ randElem vars g2, g0)
-                          | dice < 0.60 = (NodeUnary
-                                              (randElem unaryOpsOnly g2)
-                                              (fst $ randExprTree' vars g3 True),
-                                           g0)
-                          | otherwise = (NodeBinary
+randExprTree' vars g init | init && dice < 0.12 = (LeafConst (dice * 50), g5)
+                          | init && dice < 0.30 = (LeafVar $ Var $ randElem vars g2, g5)
+                          | dice < 0.60 = (NodeBinary
                                               (randElem binaryOpsOnly g2)
                                               (fst $ randExprTree' vars g3 True)
                                               (fst $ randExprTree' vars g4 True),
-                                           g0)
+                                           g5)
+                          | otherwise = (NodeUnary
+                                              (randElem unaryOpsOnly g2)
+                                              (fst $ randExprTree' vars g3 True),
+                                           g5)
     where (dice :: Double, _) = random g1
-          ((g0, g1), g2') = (first split . split) g
-          ((g2, g3), g4) = (first split . split) g2'
+          (g0:g1:g2:g3:g4:g5:_) = take 6 $ unfoldr (Just . split) g
           randElem xs g = xs !! fst (randomR (0, length xs - 1) g)
 
 -- Better to place terminating optimizations at the top, obviously
