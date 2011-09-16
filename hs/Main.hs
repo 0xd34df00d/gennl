@@ -7,6 +7,8 @@ import Genetic
 import CSVParser
 import Random
 
+import Data.List
+
 applyP f s = case s of
         Right t -> Right $ f t
         Left e -> Left e
@@ -21,4 +23,5 @@ runStuff g = show $ ppl defGA
 
 main = do
     g <- newStdGen
+    --return $ take 10 $ unfoldr (Just . randExprTree (["x", "y"])) g
     return $ runStuff g
