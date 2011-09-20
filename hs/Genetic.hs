@@ -2,6 +2,7 @@ module Genetic
     where
 
 import Control.Monad.State
+import Control.Arrow
 import Data.Packed.Matrix
 import Data.List
 import Debug.Trace
@@ -58,7 +59,8 @@ iterateGA = execState chain
     where chain = tickGA >>
                     assessPpl >>
                     cleanupFits >>
-                    sortPpl
+                    sortPpl >>
+                    mutateSome
 
 type MGState g a = State (GAState g a) ()
 
@@ -79,11 +81,20 @@ getChromoFit a st = 1 / foldl' step 1 (testSet c)
           c = cfg st
 
 sortPpl :: (RandomGen g, GAble a) => MGState g a
-sortPpl = get >>= (\st -> put $ st { ppl = map fst $ sortBy (comparing snd) (fits st) } )
+sortPpl = get >>= (\st -> put $ st { ppl = map fst $ (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) } )
 
 cleanupFits :: (RandomGen g, GAble a) => MGState g a
 cleanupFits = get >>=
     (\st -> when (length (ppl st) /= length (fits st)) $ put $ st { fits = filter ((`elem` ppl st) . fst) (fits st) } )
+
+mutateSome :: (RandomGen g, GAble a) => MGState g a
+mutateSome = do
+        st <- get
+        let ppls = ppl st
+        let toTake = length ppls `div` 5
+        let (news, st') = foldl' step ([], st) (take toTake ppls)
+        put st' { ppl = news ++ drop toTake ppls }
+    where step (ns, st) m = (: ns) `first` (mutate st m)
 
 runGA :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
 runGA = runGA' . iterateGA
@@ -92,7 +103,7 @@ runGA' :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
 runGA' st = if stopF (cfg st) (ppl st) (iter st) maxFitness
             then (best, maxFitness, st)
             else runGA $ iterateGA st
-    where (best, maxFitness) = maximumBy (comparing snd) (fits st)
+    where (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st))
 
 instance GAble IncMatrix where
     mutate st m = (m', st')

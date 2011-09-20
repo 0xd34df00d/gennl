@@ -20,7 +20,7 @@ applyP' f s = applyP f $ parseStr s
 simplified s = applyP' simplifyStab s
 incMatrix s = applyP' toIncMatrix s
 
-num = 10
+num = 1000
 
 runStuff _ (Left m) = error $ show m
 runStuff g (Right recs) = runStuff' g (map (map read) recs)
