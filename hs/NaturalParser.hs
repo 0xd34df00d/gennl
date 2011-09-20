@@ -25,7 +25,7 @@ mathExprDef = emptyDef {
         P.identLetter = letter <|> digit <|> char '_',
         P.opStart = oneOf ":!#$%&*+./<=>?@\\^|-~",
         P.opLetter = oneOf ":!#$%&*+./<=>?@\\^|-~",
-        P.reservedOpNames = ["+", "-", "*", "/", "sin", "cos", "^"]
+        P.reservedOpNames = ["+", "-", "*", "/", "sin", "cos", "log", "^"]
     }
 
 -- Generate the lexer
@@ -46,7 +46,7 @@ term = parens expr
 
 table = [
             [prefix' "-" negate', prefix' "+" id],
-            [prefix "sin", prefix "cos"],
+            [prefix "sin", prefix "cos", prefix "log"],
             [binary "^" AssocRight],
             [binary "*" AssocLeft, binary "/" AssocLeft],
             [binary "+" AssocLeft, binary "-" AssocLeft]
