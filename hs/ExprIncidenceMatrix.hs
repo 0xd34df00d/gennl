@@ -25,7 +25,10 @@ data IncMatrix = IncMatrix {
         numMat :: NumMatrix,
         ops :: [NodeType]
     }
-    deriving (Show, Eq)
+    deriving (Show)
+
+instance Eq IncMatrix where
+    a == b = ops a == ops b
 
 data VecState = VecState {
         pos :: Int,
