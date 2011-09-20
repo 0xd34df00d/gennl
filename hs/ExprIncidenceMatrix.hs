@@ -94,7 +94,7 @@ removeSubMat (pos, end) m = IncMatrix num' (except (pos, end) (ops m))
 
 except (a, b) xs = take a xs ++ drop (b + 1) xs
 
-zMat c = (c><c) (cycle [0])
+zMat c = (c><c) [0,0..]
 
 subTreeMat :: Int -> IncMatrix -> IncMatrix
 subTreeMat pos m | pos /= 0 = IncMatrix (subMatrix (pos, pos - 1) (size, size) (numMat m)) (take size $ drop pos $ ops m)

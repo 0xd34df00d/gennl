@@ -1,4 +1,8 @@
 import System.Environment
+import Control.Arrow
+import Data.List
+import Data.Either
+import Debug.Trace
 
 import ExprTree
 import NaturalParser
@@ -7,7 +11,6 @@ import Genetic
 import CSVParser
 import Random
 
-import Data.List
 
 applyP f s = case s of
         Right t -> Right $ f t
@@ -17,14 +20,20 @@ applyP' f s = applyP f $ parseStr s
 simplified s = applyP' simplifyStab s
 incMatrix s = applyP' toIncMatrix s
 
-num = 2
+num = 10
 
-runStuff g = ppl defGA
-    where defGA = initPpl num $ initGA (cfg { vars = ["x", "y"] } ) g
+runStuff _ (Left m) = error $ show m
+runStuff g (Right recs) = runStuff' g (map (map read) recs)
+
+runStuff' g recs = (a, fit, iter st, map snd $ fits st)
+    where defGA = initPpl num $ initGA (cfg { vars = ["x", "y"], testSet = map (take 2 &&& head . drop 2) recs } ) g
           cfg = defConfig :: GAConfig IncMatrix
+          (a, fit, st) = runGA defGA
+
+genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j, f i j ] | i <- [1..ni], j <- [1..nj] ]
 
 main = do
+    --file <- readFile "options.dat.txt"
+    let recs = parseCSV $ (genSynth (*) 5 5 ++ "\r\n")
     g <- newStdGen
-    let trees = take num $ unfoldr (Just . randExprTree ["x", "y"] 100) g
-    mapM_ print trees
-    mapM_ (print . toIncMatrix) trees
+    print $ runStuff g recs

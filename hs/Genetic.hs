@@ -4,6 +4,7 @@ module Genetic
 import Control.Monad.State
 import Data.Packed.Matrix
 import Data.List
+import Debug.Trace
 import Data.Ord (comparing)
 import Random
 import ExprTree
@@ -29,7 +30,7 @@ data RandomGen g => GAState g a = GAState {
         fits :: [(a, Double)]
     }
 
-class Eq a => GAble a where
+class (Eq a, Show a) => GAble a where
     mutate :: RandomGen g => GAState g a -> a -> (a, GAState g a)
     crossover :: RandomGen g => GAState g a -> (a, a) -> (a, a, GAState g a)
     compute :: [(String, Double)] -> a -> Double
@@ -42,7 +43,7 @@ defConfig = GAConfig
                 []
                 []
                 7
-                (\_ its maxF -> its > 1000 || maxF > 0.95)
+                (\_ its maxF -> its > 100 || maxF > 0.95)
 
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
 initGA c g = GAState c g 0 [] []
@@ -62,7 +63,7 @@ iterateGA = execState chain
 type MGState g a = State (GAState g a) ()
 
 tickGA :: RandomGen g => MGState g a
-tickGA = get >>= (\st -> put $ st { iter = iter st + 1 } )
+tickGA = get >>= (\st -> (show $ iter st + 1) `trace` put $ st { iter = iter st + 1 } )
 
 assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
@@ -84,9 +85,12 @@ cleanupFits :: (RandomGen g, GAble a) => MGState g a
 cleanupFits = get >>=
     (\st -> when (length (ppl st) /= length (fits st)) $ put $ st { fits = filter ((`elem` ppl st) . fst) (fits st) } )
 
-runGA :: (RandomGen g, GAble a) => GAState g a -> a
-runGA st = if stopF (cfg st) (ppl st) (iter st) maxFitness
-            then best
+runGA :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
+runGA = runGA' . iterateGA
+
+runGA' :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
+runGA' st = if stopF (cfg st) (ppl st) (iter st) maxFitness
+            then (best, maxFitness, st)
             else runGA $ iterateGA st
     where (best, maxFitness) = maximumBy (comparing snd) (fits st)
 
