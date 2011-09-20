@@ -67,11 +67,8 @@ toIncMatrix t = IncMatrix (buildMatrix b (b - 1) f) (nodesList st)
                    | prevNodes st !! j == i = 1
                    | otherwise = 0
 
-randIncMatrix :: (RandomGen g) => [String] -> g -> (IncMatrix, g)
-randIncMatrix vars = first toIncMatrix . randExprTree vars
-
---randIncMatrix vars g = trace (show $ fst r) ((first toIncMatrix) r)
---    where r = randExprTree vars g
+randIncMatrix :: (RandomGen g) => [String] -> Int -> g -> (IncMatrix, g)
+randIncMatrix vars cpx = first toIncMatrix . randExprTree vars cpx
 
 replaceSubMat :: Int -> IncMatrix -> IncMatrix -> IncMatrix
 replaceSubMat pos sub m = insertSubMat pos sub $ removeSubMat (pos, subTreeEndIdx (numMat m) pos) m

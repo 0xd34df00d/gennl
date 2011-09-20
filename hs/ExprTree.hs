@@ -45,24 +45,27 @@ unaryNode s = NodeUnary <$> lookup s al
 binaryNode s = NodeBinary <$> lookup s al
     where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
 
-randExprTree :: (RandomGen g) => [String] -> g -> (ExprTree, g)
-randExprTree vars g = randExprTree' vars g False
+randExprTree :: (RandomGen g) => [String] -> Int -> g -> (ExprTree, g)
+randExprTree vars cpx g = randExprTree' vars g (0, cpx)
 
-randExprTree' :: (RandomGen g) => [String] -> g -> Bool -> (ExprTree, g)
-randExprTree' vars g init | init && dice < 0.12 = (LeafConst (dice * 50), g5)
-                          | init && dice < 0.30 = (LeafVar $ Var $ randElem vars g2, g5)
-                          | dice < 0.60 = (NodeBinary
-                                              (randElem binaryOpsOnly g2)
-                                              (fst $ randExprTree' vars g3 True)
-                                              (fst $ randExprTree' vars g4 True),
-                                           g5)
-                          | otherwise = (NodeUnary
-                                              (randElem unaryOpsOnly g2)
-                                              (fst $ randExprTree' vars g3 True),
-                                           g5)
+randExprTree' :: (RandomGen g) => [String] -> g -> (Int, Int) -> (ExprTree, g)
+randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.12 0.30 = (LeafConst (dice * 50), g5)
+                               | dh /= 0 && thr dice 0.30 0.30 = (LeafVar $ Var $ randElem vars g2, g5)
+                               | dice <= 0.60 = (NodeBinary
+                                                    (randElem binaryOpsOnly g2)
+                                                    (fst $ randExprTree' vars g3 (dh + 1, cpx))
+                                                    (fst $ randExprTree' vars g4 (dh + 1, cpx)),
+                                                 g5)
+                               | otherwise = (NodeUnary
+                                                    (randElem unaryOpsOnly g2)
+                                                    (fst $ randExprTree' vars g3 (dh + 1, cpx)),
+                                                 g5)
     where (dice :: Double, _) = random g1
           (g0:g1:g2:g3:g4:g5:_) = take 6 $ unfoldr (Just . split) g
           randElem xs g = xs !! fst (randomR (0, length xs - 1) g)
+          (?) a b c | a = b
+                    | otherwise = c
+          thr dice t m = dice <= ((dh < cpx) ? t $ t / m)
 
 -- Better to place terminating optimizations at the top, obviously
 simplifyTree :: ExprTree -> ExprTree

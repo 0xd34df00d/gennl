@@ -17,6 +17,7 @@ data GAConfig a = GAConfig {
         binaryOpsPool :: [BinaryFunc],
         vars :: [String],
         testSet :: [TestSample],                     -- The order of doubles should be the same as in vars.
+        rndCpx :: Int,
         stopF :: [a] -> Int -> Double -> Bool
     }
 
@@ -32,7 +33,7 @@ class Eq a => GAble a where
     mutate :: RandomGen g => GAState g a -> a -> (a, GAState g a)
     crossover :: RandomGen g => GAState g a -> (a, a) -> (a, a, GAState g a)
     compute :: [(String, Double)] -> a -> Double
-    randGAInst :: RandomGen g => [String] -> g -> (a, g)
+    randGAInst :: RandomGen g => [String] -> Int -> g -> (a, g)
 
 defConfig :: (GAble a) => GAConfig a
 defConfig = GAConfig
@@ -40,14 +41,16 @@ defConfig = GAConfig
                 (map fst binaryOps)
                 []
                 []
+                7
                 (\_ its maxF -> its > 1000 || maxF > 0.95)
 
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
 initGA c g = GAState c g 0 [] []
 
 initPpl :: (RandomGen g, GAble a) => Int -> GAState g a -> GAState g a
-initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars $ cfg st)) g1, randGen = g2 }
+initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c)) g1, randGen = g2 }
     where (g1, g2) = split $ randGen st
+          c = cfg st
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
