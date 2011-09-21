@@ -64,7 +64,7 @@ iterateGA = execState chain
                     cleanupFits >>
                     assessPpl >>
                     sortPpl >>
-                    --crossoverSome >>
+                    crossoverSome >>
                     assessPpl >>
                     sortPpl
 
@@ -109,14 +109,14 @@ crossoverSome = do
         unless (1 `elem` map snd (fits st)) $ do
             let ppls = ppl st
             let l = length ppls
-            let toSkip = l - max 7 (l `div` 10)
-            let rest = drop toSkip ppls
+            let rest = lastN (min 7 (l `div` 10)) ppls
             let gs = rndGens $ randGen st
             let pairs = ns [ (m1, m2) | m1 <- rest, m2 <- rest ]
-            let news = ns $ zipWith (crossover st) gs pairs
+            let news = ns $ withStrategy rseq $ zipWith (crossover st) gs pairs
             let nl = length news
-            put st { ppl = drop nl ppls ++ concatMap (\(x, y) -> [x, y]) news, randGen = gs !! nl }
+            put st { ppl = drop (nl * 2) ppls ++ concatMap (\(x, y) -> [x, y]) news, randGen = gs !! nl }
                 where ns = filter (uncurry (/=))
+                      lastN n xs = drop (length xs - n) xs
 
 runGA :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
 runGA = runGA' . iterateGA
@@ -142,10 +142,13 @@ instance GAble IncMatrix where
               unaryMutate t1 c = UnNode $ randElem (unaryOpsPool c) t1
               binaryMutate t1 c = BinNode $ randElem (binaryOpsPool c) t1
     crossover st g (m1, m2) = (m1', m2')
-        where (p1:p2:_, gen) = nRands g 2
+        where gs = rndGens g
+              getP m g = fst $ randomR (1, (cols $ numMat m) - 1) g
+              p1 = getP m1 (head gs)
+              p2 = getP m2 (gs !! 1)
               m1' = swap'' (m1, p1) (m2, p2)
               m2' = swap'' (m2, p2) (m1, p1)
-              swap'' (m1, p1) (m2, p2) = replaceSubMat (p1 `mod` m1s + 1) (subTreeMat (p2 `mod` m2s + 1) m2) m1
+              swap'' (m1, p1) (m2, p2) = replaceSubMat p1 (subTreeMat p2 m2) m1
                     where m1s = cols $ numMat m1
                           m2s = cols $ numMat m2
     compute = evalMatrix

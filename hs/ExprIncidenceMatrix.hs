@@ -78,18 +78,18 @@ replaceSubMat :: Int -> IncMatrix -> IncMatrix -> IncMatrix
 replaceSubMat pos sub m = insertSubMat pos sub $ removeSubMat (pos, subTreeEndIdx (numMat m) pos) m
 
 insertSubMat :: Int -> IncMatrix -> IncMatrix -> IncMatrix
-insertSubMat pos sub m = (show (pos, cols snum, cols mnum, pos - cols mnum - 1)) `trace` IncMatrix (fromBlocks [blk1beg ++ blk1mid ++ blk1end]) ops'
+insertSubMat pos sub m = IncMatrix (insertNumMat pos (numMat sub) (numMat m)) ops'
     where ops' = take pos (ops m) ++ ops sub ++ drop pos (ops m)
-          mnum = numMat m
-          snum = numMat sub
-          blk1beg | pos > 0 = [subMatrix (0, 0) (pos, pos) mnum]
-                  | otherwise = []
-          blk1mid | c > 1 = [zMat c]
-                  | otherwise = []
-            where c = cols snum
-          blk1end | diff <= 0 = []
-                  | otherwise = [zMat diff]
-            where diff = pos - cols mnum - 1
+
+insertNumMat :: Int -> NumMatrix -> NumMatrix -> NumMatrix
+insertNumMat pos sub m = buildMatrix (ms + ss) (ms + ss - 1) f
+    where ms = cols m
+          ss = cols sub
+          f (i, j) | i < pos && j < pos                                                = m @@> (i, j)
+                   | i < pos && j >= pos + ss - 1                                       = m @@> (i, j - ss + 1)
+                   | (i >= pos && i < pos + ss) && (j >= pos - 1 && j < pos + ss - 1)   = sub @@> (i - pos, j - pos + 1)
+                   | i >= pos + ss && j >= pos + ss - 1                                 = m @@> (i - ss, j - ss + 1)
+                   | otherwise                                                          = 0
 
 removeSubMat :: (Int, Int) -> IncMatrix -> IncMatrix
 removeSubMat (pos, end) m = IncMatrix num' (except (pos, end) (ops m))

@@ -20,20 +20,22 @@ applyP' f s = applyP f $ parseStr s
 simplified s = applyP' simplifyStab s
 incMatrix s = applyP' toIncMatrix s
 
-num = 100
+runStuff (Left m) _ _ = error $ show m
+runStuff (Right recs) num g = runStuff' (map (map read) recs) num g
 
-runStuff _ (Left m) = error $ show m
-runStuff g (Right recs) = runStuff' g (map (map read) recs)
-
-runStuff' g recs = (a, fit, iter st, map snd $ fits st)
+runStuff' recs num g = (a, fit, iter st, map snd $ fits st)
     where defGA = initPpl num $ initGA (cfg { vars = ["x", "y"], testSet = map (take 2 &&& head . drop 2) recs } ) g
           cfg = defConfig :: GAConfig IncMatrix
           (a, fit, st) = runGA defGA
 
 genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j, f i j ] | i <- [1..ni], j <- [1..nj] ]
 
-main = do
-    --file <- readFile "options.dat.txt"
-    let recs = parseCSV (genSynth (\x y -> x * y + x * x * y * y - x / y) 7 7 ++ "\r\n")
+main' num pts = do
+    let recs = parseCSV (genSynth (\x y -> x * y + x * x * y * y) pts pts ++ "\r\n")
     g <- newStdGen
-    print $ runStuff g recs
+    print $ runStuff recs num g
+
+main = do
+    args <- getArgs
+    main' (read $ args !! 0) (read $ args !! 1)
+    --file <- readFile "options.dat.txt"
