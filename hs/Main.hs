@@ -20,7 +20,7 @@ applyP' f s = applyP f $ parseStr s
 simplified s = applyP' simplifyStab s
 incMatrix s = applyP' toIncMatrix s
 
-num = 1000
+num = 100
 
 runStuff _ (Left m) = error $ show m
 runStuff g (Right recs) = runStuff' g (map (map read) recs)
@@ -34,6 +34,6 @@ genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j
 
 main = do
     --file <- readFile "options.dat.txt"
-    let recs = parseCSV $ (genSynth (*) 5 5 ++ "\r\n")
+    let recs = parseCSV (genSynth (\x y -> x * y + x * x * y * y - x / y) 7 7 ++ "\r\n")
     g <- newStdGen
     print $ runStuff g recs

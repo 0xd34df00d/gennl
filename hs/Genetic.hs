@@ -3,6 +3,7 @@ module Genetic
 
 import Control.Monad.State
 import Control.Arrow
+import Control.Parallel.Strategies
 import Data.Packed.Matrix
 import Data.List
 import Debug.Trace
@@ -32,8 +33,8 @@ data RandomGen g => GAState g a = GAState {
     }
 
 class (Eq a, Show a) => GAble a where
-    mutate :: RandomGen g => GAState g a -> a -> (a, GAState g a)
-    crossover :: RandomGen g => GAState g a -> (a, a) -> (a, a, GAState g a)
+    mutate :: RandomGen g => GAState g a -> g -> a -> a
+    crossover :: RandomGen g => GAState g a -> g -> (a, a) -> (a, a)
     compute :: [(String, Double)] -> a -> Double
     randGAInst :: RandomGen g => [String] -> Int -> g -> (a, g)
 
@@ -58,9 +59,14 @@ iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
     where chain = tickGA >>
                     assessPpl >>
-                    cleanupFits >>
                     sortPpl >>
-                    mutateSome
+                    mutateSome >>
+                    cleanupFits >>
+                    assessPpl >>
+                    sortPpl >>
+                    --crossoverSome >>
+                    assessPpl >>
+                    sortPpl
 
 type MGState g a = State (GAState g a) ()
 
@@ -71,17 +77,18 @@ assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
         st <- get
         let ppls = ppl st
-        put st { fits = zip ppls (map (getFit st) ppls) }
+        put st { fits = zip ppls (parMap rdeepseq (getFit st) ppls) }
     where getFit st a | Just x <- lookup a (fits st) = x
                       | otherwise = getChromoFit a st
 
 getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> Double
-getChromoFit a st = 1 / foldl' step 1 (testSet c)
-    where step s smp = s + abs (snd smp - compute (zip (vars c) (fst smp)) a)
+getChromoFit a st = 1 / (sum xs + 1)
+    where xs = map f (testSet c)
+          f smp = abs (snd smp - compute (zip (vars c) (fst smp)) a)
           c = cfg st
 
 sortPpl :: (RandomGen g, GAble a) => MGState g a
-sortPpl = get >>= (\st -> put $ st { ppl = map fst $ (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) } )
+sortPpl = get >>= (\st -> put $ st { ppl = map fst (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) } )
 
 cleanupFits :: (RandomGen g, GAble a) => MGState g a
 cleanupFits = get >>=
@@ -92,9 +99,24 @@ mutateSome = do
         st <- get
         let ppls = ppl st
         let toTake = length ppls `div` 5
-        let (news, st') = foldl' step ([], st) (take toTake ppls)
-        put st' { ppl = news ++ drop toTake ppls }
-    where step (ns, st) m = (: ns) `first` (mutate st m)
+        let gs = rndGens $ randGen st
+        let news = zipWith (mutate st) gs (take toTake ppls)
+        put st { ppl = news ++ drop toTake ppls, randGen = gs !! toTake }
+
+crossoverSome :: (RandomGen g, GAble a) => MGState g a
+crossoverSome = do
+        st <- get
+        unless (1 `elem` map snd (fits st)) $ do
+            let ppls = ppl st
+            let l = length ppls
+            let toSkip = l - max 7 (l `div` 10)
+            let rest = drop toSkip ppls
+            let gs = rndGens $ randGen st
+            let pairs = ns [ (m1, m2) | m1 <- rest, m2 <- rest ]
+            let news = ns $ zipWith (crossover st) gs pairs
+            let nl = length news
+            put st { ppl = drop nl ppls ++ concatMap (\(x, y) -> [x, y]) news, randGen = gs !! nl }
+                where ns = filter (uncurry (/=))
 
 runGA :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
 runGA = runGA' . iterateGA
@@ -106,8 +128,8 @@ runGA' st = if stopF (cfg st) (ppl st) (iter st) maxFitness
     where (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st))
 
 instance GAble IncMatrix where
-    mutate st m = (m', st')
-        where (t1:t2:t3:_, gen) = nRands (randGen st) 3
+    mutate st g m = m'
+        where (t1:t2:t3:_, gen) = nRands g 3
               opIdx = floor $ fromIntegral (rows (numMat m) + 1) * t1
               newOp = case ops m !! opIdx of
                     LeafCNode _ -> leafMutate (t2, t3) (cfg st)
@@ -115,17 +137,15 @@ instance GAble IncMatrix where
                     UnNode f -> unaryMutate t2 (cfg st)
                     BinNode f -> binaryMutate t2 (cfg st)
               m' = m { ops = replaceElem (ops m) opIdx newOp }
-              st' = st { randGen = gen }
               leafMutate (t1, t2) c | t1 >= 0.5 = LeafCNode $ t2 * 100
                                     | otherwise = LeafTNode $ randElem (vars c) t2
               unaryMutate t1 c = UnNode $ randElem (unaryOpsPool c) t1
               binaryMutate t1 c = BinNode $ randElem (binaryOpsPool c) t1
-    crossover st (m1, m2) = (m1', m2', st')
-        where (p1:p2:_, gen) = nRands (randGen st) 2
+    crossover st g (m1, m2) = (m1', m2')
+        where (p1:p2:_, gen) = nRands g 2
               m1' = swap'' (m1, p1) (m2, p2)
               m2' = swap'' (m2, p2) (m1, p1)
-              st' = st { randGen = gen }
-              swap'' (m1, p1) (m2, p2) = replaceSubMat (p1 `mod` m1s) (subTreeMat (p2 `mod` m2s) m2) m1
+              swap'' (m1, p1) (m2, p2) = replaceSubMat (p1 `mod` m1s + 1) (subTreeMat (p2 `mod` m2s + 1) m2) m1
                     where m1s = cols $ numMat m1
                           m2s = cols $ numMat m2
     compute = evalMatrix
