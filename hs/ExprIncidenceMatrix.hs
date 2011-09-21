@@ -12,10 +12,10 @@ import SupportUtils
 import Random
 import Control.Arrow
 
-data NodeType = BinNode BinaryFunc
-                | UnNode UnaryFunc
-                | LeafCNode Const
-                | LeafTNode String
+data NodeType = BinNode !BinaryFunc
+                | UnNode !UnaryFunc
+                | LeafCNode !Const
+                | LeafTNode !String
     deriving (Show, Eq)
 
 type NumMatrix = Matrix Double
@@ -23,8 +23,8 @@ type NumMatrix = Matrix Double
 instance Eq a => Eq (Matrix a)
 
 data IncMatrix = IncMatrix {
-        numMat :: NumMatrix,
-        ops :: [NodeType]
+        numMat :: !NumMatrix,
+        ops :: ![NodeType]
     }
     deriving (Show)
 
@@ -41,15 +41,15 @@ data VecState = VecState {
 emptyVecState = VecState 0 [] []
 
 evalMatrix :: [(String, Double)] -> IncMatrix -> Double
-evalMatrix vals (IncMatrix _ ops) = head $ foldr step [] ops
-    where step (LeafCNode c) st = st ++ [c]
-          step (LeafTNode var) st | Just val <- lookup var vals = val : st
-                                  | otherwise = error $ "Unknown variable " ++ var ++ ", supplied varmap: " ++ show vals
-          step (UnNode f) st | Just f' <- lookup f unaryOps = f' (head st) : tail st
-                             | otherwise = error $ "Unknown unary function " ++ show f
-          step (BinNode f) st | Just f' <- lookup f binaryOps = f' (head st) (head st') : tail st'
-                              | otherwise = error $ "Unknown binary function " ++ show f
-                where st' = tail st
+evalMatrix !vals !(IncMatrix _ ops) = head $ foldr step [] ops
+    where step !(LeafCNode c) !st = c : st
+          step !(LeafTNode var) !st | Just !val <- lookup var vals = val : st
+                                    | otherwise = error $ "Unknown variable " ++ var ++ ", supplied varmap: " ++ show vals
+          step !(UnNode f) !st | Just !f' <- lookup f unaryOps = f' (head st) : tail st
+                               | otherwise = error $ "Unknown unary function " ++ show f
+          step !(BinNode f) !st | Just !f' <- lookup f binaryOps = f' (head st) (head st') : tail st'
+                                | otherwise = error $ "Unknown binary function " ++ show f
+                where !st' = tail st
 
 (|++|) st n = st { nodesList = n : nodesList st, pos = pos st + 1 }
 (|++-|) st b = st { prevNodes = b : prevNodes st }
