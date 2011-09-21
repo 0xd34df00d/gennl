@@ -21,6 +21,7 @@ data GAConfig a = GAConfig {
         vars :: [String],
         testSet :: [TestSample],                     -- The order of doubles should be the same as in vars.
         rndCpx :: Int,
+        optNum :: Int,
         stopF :: [a] -> Int -> Double -> Bool
     }
 
@@ -45,6 +46,7 @@ defConfig = GAConfig
                 []
                 []
                 7
+                200
                 (\_ its maxF -> its > 100 || maxF > 0.95)
 
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
@@ -60,8 +62,9 @@ iterateGA = execState chain
     where chain = tickGA >>
                     assessPpl >>
                     sortPpl >>
-                    mutateSome >>
+                    cleanBad >>
                     cleanupFits >>
+                    mutateSome >>
                     assessPpl >>
                     sortPpl >>
                     crossoverSome >>
@@ -84,8 +87,15 @@ assessPpl = do
 getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> Double
 getChromoFit a st = 1 / (sum xs + 1)
     where xs = map f (testSet c)
-          f smp = abs (snd smp - compute (zip (vars c) (fst smp)) a)
+          f smp = abs (sqrt (snd smp - compute (zip (vars c) (fst smp)) a))
           c = cfg st
+
+cleanBad :: (GAble a, RandomGen g) => MGState g a
+cleanBad = do
+        st <- get
+        let ppls = ppl st
+        put st { ppl = drop (diff ppls st) ppls }
+            where diff p st = length p - (optNum $ cfg st)
 
 sortPpl :: (RandomGen g, GAble a) => MGState g a
 sortPpl = get >>= (\st -> put $ st { ppl = map fst (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) } )
@@ -101,7 +111,7 @@ mutateSome = do
         let toTake = length ppls `div` 5
         let gs = rndGens $ randGen st
         let news = zipWith (mutate st) gs (take toTake ppls)
-        put st { ppl = news ++ drop toTake ppls, randGen = gs !! toTake }
+        put st { ppl = news ++ ppls, randGen = gs !! toTake }
 
 crossoverSome :: (RandomGen g, GAble a) => MGState g a
 crossoverSome = do
@@ -114,7 +124,7 @@ crossoverSome = do
             let pairs = ns [ (m1, m2) | m1 <- rest, m2 <- rest ]
             let news = ns $ withStrategy rseq $ zipWith (crossover st) gs pairs
             let nl = length news
-            put st { ppl = drop (nl * 2) ppls ++ concatMap (\(x, y) -> [x, y]) news, randGen = gs !! nl }
+            put st { ppl = ppls ++ concatMap (\(x, y) -> [x, y]) news, randGen = gs !! nl }
                 where ns = filter (uncurry (/=))
                       lastN n xs = drop (length xs - n) xs
 
@@ -124,7 +134,7 @@ runGA = runGA' . iterateGA
 runGA' :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
 runGA' st = if stopF (cfg st) (ppl st) (iter st) maxFitness
             then (best, maxFitness, st)
-            else runGA $ iterateGA st
+            else runGA' $ iterateGA st
     where (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st))
 
 instance GAble IncMatrix where

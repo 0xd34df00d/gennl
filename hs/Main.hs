@@ -24,7 +24,7 @@ runStuff (Left m) _ _ = error $ show m
 runStuff (Right recs) num g = runStuff' (map (map read) recs) num g
 
 runStuff' recs num g = (a, fit, iter st, map snd $ fits st)
-    where defGA = initPpl num $ initGA (cfg { vars = ["x", "y"], testSet = map (take 2 &&& head . drop 2) recs } ) g
+    where defGA = initPpl num $ initGA (cfg { vars = ["x", "y"], testSet = map (take 2 &&& head . drop 2) recs, optNum = num } ) g
           cfg = defConfig :: GAConfig IncMatrix
           (a, fit, st) = runGA defGA
 
