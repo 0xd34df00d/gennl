@@ -61,7 +61,7 @@ randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.12 0.30 = (LeafConst (dic
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx)),
                                                  g5)
     where (dice :: Double, _) = random g1
-          (g0:g1:g2:g3:g4:g5:_) = take 6 $ unfoldr (Just . split) g
+          (g0:g1:g2:g3:g4:g5:_) = take 6 (rndGens g)
           randElem xs g = xs !! fst (randomR (0, length xs - 1) g)
           (?) a b c | a = b
                     | otherwise = c

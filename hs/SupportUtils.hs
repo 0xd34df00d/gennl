@@ -4,7 +4,8 @@ module SupportUtils
     (
         TextableException,
         failStr,
-        nRands
+        nRands,
+        rndGens
     )
     where
 
@@ -26,3 +27,6 @@ failStr str = throw $ TextableException str
 nRands :: (RandomGen g, Random a) => g -> Int -> ([a], g)
 nRands g n = (take n $ unfoldr (Just . random) g1, g2)
     where (g1, g2) = split g
+
+rndGens :: (RandomGen g) => g -> [g]
+rndGens = unfoldr (Just . split)
