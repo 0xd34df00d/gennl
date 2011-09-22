@@ -1,8 +1,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
 
 module ExprTree
     where
 
+import Control.Parallel
+import Control.Parallel.Strategies
 import Data.Functor ((<$>))
 import SupportUtils
 import Random
@@ -28,10 +31,10 @@ binaryOps = [ (Plus, (+)), (Minus, (-)), (Mul, (*)), (Div, (/)), (Pow, (**)) ]
 
 binaryOpsOnly = map fst binaryOps
 
-data ExprTree = NodeUnary UnaryFunc ExprTree
-                | NodeBinary BinaryFunc ExprTree ExprTree
-                | LeafVar Var
-                | LeafConst Const
+data ExprTree = NodeUnary !UnaryFunc !ExprTree
+                | NodeBinary !BinaryFunc !ExprTree !ExprTree
+                | LeafVar !Var
+                | LeafConst !Const
     deriving (Show, Eq)
 
 intLeaf = LeafConst . fromInteger
@@ -66,6 +69,57 @@ randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.12 0.30 = (LeafConst (dic
           (?) a b c | a = b
                     | otherwise = c
           thr dice t m = dice <= ((dh < cpx) ? t $ t / m)
+
+numNodes :: ExprTree -> Int
+numNodes (LeafVar _) = 1
+numNodes (LeafConst _) = 1
+numNodes (NodeUnary _ t) = 1 + numNodes t
+numNodes (NodeBinary _ l r) = 1 + numNodes l + numNodes r
+
+evalTree :: [(String, Double)] -> ExprTree -> Double
+evalTree _ (LeafConst c) = c
+evalTree !vars !(LeafVar (Var v)) | Just c <- lookup v vars = c
+                                | otherwise = error $ "Unknown var " ++ v
+evalTree !vars !(NodeUnary f t) | Just f' <- lookup f unaryOps = f' $ evalTree vars t
+                              | otherwise = error $ "Unknown uf " ++ show f
+evalTree !vars !(NodeBinary f l r) | Just f' <- lookup f binaryOps = (el `using` rdeepseq) `par` (er `using` rdeepseq) `pseq` f' el er
+                                 | otherwise = error $ "Unknown bf " ++ show f
+                                    where el = evalTree vars l
+                                          er = evalTree vars r
+
+atNodeBin :: (Int -> Int -> ExprTree -> ExprTree) -> Int -> Int -> (ExprTree, ExprTree) -> ExprTree
+atNodeBin f i n (l, r) | nl +i >= n = f (i + 1) n l
+                       | otherwise = f (i + nl + 1) n r
+                          where nl = numNodes l
+
+atNodeBin2 :: (Int -> Int -> ExprTree -> ExprTree) -> Int -> Int -> (ExprTree, ExprTree) -> (ExprTree, ExprTree)
+atNodeBin2 f i n (l, r) | nl +i >= n = (f (i + 1) n l, r)
+                        | otherwise = (l, f (i + nl + 1) n r)
+                          where nl = numNodes l
+
+subTree :: Int -> ExprTree -> ExprTree
+subTree = subTree' 0
+
+subTree' :: Int -> Int -> ExprTree -> ExprTree
+subTree' i n t | i == n = t
+subTree' i n (LeafVar _) = walkFail "subTree: var node" i n
+subTree' i n (LeafConst _) = walkFail "subTree: const node" i n
+subTree' i n (NodeBinary _ l r) = atNodeBin subTree' i n (l, r)
+subTree' i n (NodeUnary _ t) = subTree' (i + 1) n t
+
+repSubTree :: Int -> ExprTree -> ExprTree -> ExprTree
+repSubTree = repSubTree' 0
+
+repSubTree' :: Int -> Int -> ExprTree -> ExprTree -> ExprTree
+repSubTree' i n r _ | i == n = r
+repSubTree' i n r (LeafVar _) = walkFail "repSubTree: var node" i n
+repSubTree' i n r (LeafConst _) = walkFail "repSubTree: const node" i n
+repSubTree' i n r (NodeBinary f t1 t2) = NodeBinary f t1' t2'
+    where (t1', t2') = atNodeBin2 (\i n t -> repSubTree' i n r t) i n (t1, t2)
+repSubTree' i n r (NodeUnary f t) = NodeUnary f (repSubTree' (i + 1) n r t)
+
+walkFail :: String -> Int -> Int -> a
+walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n
 
 -- Better to place terminating optimizations at the top, obviously
 simplifyTree :: ExprTree -> ExprTree

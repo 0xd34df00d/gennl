@@ -25,13 +25,13 @@ runStuff (Right recs) num g = runStuff' (map (map read) recs) num g
 
 runStuff' recs num g = (a, fit, iter st, map snd $ fits st)
     where defGA = initPpl num $ initGA (cfg { vars = ["x", "y"], testSet = map (take 2 &&& head . drop 2) recs, optNum = num } ) g
-          cfg = defConfig :: GAConfig IncMatrix
+          cfg = defConfig :: GAConfig ExprTree
           (a, fit, st) = runGA defGA
 
 genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j, f i j ] | i <- [1..ni], j <- [1..nj] ]
 
 main' num pts = do
-    let recs = parseCSV (genSynth (\x y -> x * y + x * x * y * y) pts pts ++ "\r\n")
+    let recs = parseCSV (genSynth (\x y -> x * y + x * x * y * y - x * x) pts pts ++ "\r\n")
     g <- newStdGen
     print $ runStuff recs num g
 

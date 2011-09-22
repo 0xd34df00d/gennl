@@ -6,6 +6,7 @@ import Control.Arrow
 import Control.Parallel.Strategies
 import Data.Packed.Matrix
 import Data.List
+import Data.Maybe
 import Debug.Trace
 import Data.Ord (comparing)
 import Random
@@ -38,6 +39,8 @@ class (Eq a, Show a) => GAble a where
     crossover :: RandomGen g => GAState g a -> g -> (a, a) -> (a, a)
     compute :: [(String, Double)] -> a -> Double
     randGAInst :: RandomGen g => [String] -> Int -> g -> (a, g)
+    complexity :: a -> Double
+    complexity _ = 1.0
 
 defConfig :: (GAble a) => GAConfig a
 defConfig = GAConfig
@@ -59,28 +62,28 @@ initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
-    where chain = tickGA >>
-                    assessPpl >>
-                    sortPpl >>
-                    cleanBad >>
-                    cleanupFits >>
-                    mutateSome >>
-                    assessPpl >>
-                    sortPpl >>
-                    crossoverSome >>
-                    assessPpl >>
-                    sortPpl
+    where chain = assessPpl >>
+                  sortPpl >>
+                  cleanBad >>
+                  cleanupFits >>
+                  tickGA >>
+                  mutateSome >>
+                  assessPpl >>
+                  sortPpl >>
+                  crossoverSome >>
+                  assessPpl >>
+                  sortPpl
 
 type MGState g a = State (GAState g a) ()
 
-tickGA :: RandomGen g => MGState g a
-tickGA = get >>= (\st -> (show $ iter st + 1) `trace` put $ st { iter = iter st + 1 } )
+tickGA :: (GAble a, RandomGen g) => MGState g a
+tickGA = get >>= (\st -> put $ st { iter = iter st + 1 } )
 
 assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
         st <- get
         let ppls = ppl st
-        put st { fits = zip ppls (parMap rdeepseq (getFit st) ppls) }
+        put st { fits = zip ppls (map (getFit st) ppls) }
     where getFit st a | Just x <- lookup a (fits st) = x
                       | otherwise = getChromoFit a st
 
@@ -93,9 +96,11 @@ getChromoFit a st = 1 / (sum xs + 1)
 cleanBad :: (GAble a, RandomGen g) => MGState g a
 cleanBad = do
         st <- get
-        let ppls = ppl st
+        let ppls' = ppl st
+        let fs = fits st
+        let ppls = filter (\a -> not $ isNaN $ fromMaybe (0/0) (lookup a fs)) ppls'
         put st { ppl = drop (diff ppls st) ppls }
-            where diff p st = length p - (optNum $ cfg st)
+            where diff p st = length p - optNum (cfg st)
 
 sortPpl :: (RandomGen g, GAble a) => MGState g a
 sortPpl = get >>= (\st -> put $ st { ppl = map fst (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) } )
@@ -153,7 +158,7 @@ instance GAble IncMatrix where
               binaryMutate t1 c = BinNode $ randElem (binaryOpsPool c) t1
     crossover st g (m1, m2) = (m1', m2')
         where gs = rndGens g
-              getP m g = fst $ randomR (1, (cols $ numMat m) - 1) g
+              getP m g = fst $ randomR (1, cols (numMat m) - 1) g
               p1 = getP m1 (head gs)
               p2 = getP m2 (gs !! 1)
               m1' = swap'' (m1, p1) (m2, p2)
@@ -163,6 +168,43 @@ instance GAble IncMatrix where
                           m2s = cols $ numMat m2
     compute = evalMatrix
     randGAInst = randIncMatrix
+
+instance GAble ExprTree where
+    mutate = mutateTree
+    crossover = coTrees
+    compute = evalTree
+    randGAInst = randExprTree
+    complexity = fromIntegral . numNodes
+
+mutateTree :: (RandomGen g) => GAState g ExprTree -> g -> ExprTree -> ExprTree
+mutateTree st g t = mutateTree' st g1 t (fst $ randomR (0, numNodes t - 1) g2) 0
+    where (g1, g2) = split g
+
+mutateTree' :: (RandomGen g) => GAState g ExprTree -> g -> ExprTree -> Int -> Int -> ExprTree
+mutateTree' st g (NodeBinary f l r) n i | n == i = NodeBinary (mutGene f (binaryOpsPool $ cfg st) g) l r
+                                        | nl + i >= n = NodeBinary f (mutateTree' st g l n (i + 1)) r
+                                        | otherwise = NodeBinary f l (mutateTree' st g r n (i + nl + 1))
+                                            where nl = numNodes l
+mutateTree' st g (NodeUnary f t) n i | n == i = NodeUnary (mutGene f (unaryOpsPool $ cfg st) g) t
+                                     | otherwise = NodeUnary f (mutateTree' st g t n (i + 1))
+mutateTree' st g l@(LeafVar (Var v)) n i | n == i = LeafVar $ Var $ mutGene v (vars $ cfg st) g
+                                         | otherwise = error $ "WTF? Var node, i = " ++ show i ++ "; n = " ++ show n
+mutateTree' st g l@(LeafConst _) n i | n == i = LeafConst $ fst (random g) * 100
+                                     | otherwise = error $ "WTF? Const node, i = " ++ show i ++ "; n = " ++ show n
+
+mutGene :: (Eq a, RandomGen g) => a -> [a] -> g -> a
+mutGene ex vars g = fi !! fst (randomR (0, length fi - 1) g)
+    where fi = filter (/= ex) vars
+
+coTrees :: (RandomGen g) => GAState g ExprTree -> g -> (ExprTree, ExprTree) -> (ExprTree, ExprTree)
+coTrees st g (t1, t2) = (t1', t2')
+    where gs = rndGens g
+          p1 = getP (gs !! 0) t1
+          p2 = getP (gs !! 1) t2
+          t1' = swap (t1, p1) (t2, p2)
+          t2' = swap (t2, p2) (t1, p1)
+          getP g t = fst $ randomR (0, numNodes t - 1) g
+          swap (t1, p1) (t2, p2) = repSubTree p1 (subTree p2 t2) t1
 
 -- Utility stuff
 randElem :: [a] -> Double -> a
