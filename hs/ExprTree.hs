@@ -7,10 +7,12 @@ module ExprTree
 import Control.Parallel
 import Control.Parallel.Strategies
 import Data.Functor ((<$>))
-import SupportUtils
 import Random
 import Control.Arrow
 import Data.List
+
+import SupportUtils
+import FormatClass
 
 type Const = Double
 
@@ -20,12 +22,24 @@ data Var = Var String
 data UnaryFunc = Sin | Cos | Log
     deriving (Show, Eq)
 
+instance Formattable UnaryFunc where
+    pretty Sin = "sin"
+    pretty Cos = "cos"
+    pretty Log = "log"
+
 unaryOps = [ (Sin, sin), (Cos, cos), (Log, log) ]
 
 unaryOpsOnly = map fst unaryOps
 
 data BinaryFunc = Plus | Minus | Mul | Div | Pow
     deriving (Show, Eq)
+
+instance Formattable BinaryFunc where
+    pretty Plus = "+"
+    pretty Minus = "-"
+    pretty Mul = "*"
+    pretty Div = "/"
+    pretty Pow = "^"
 
 binaryOps = [ (Plus, (+)), (Minus, (-)), (Mul, (*)), (Div, (/)), (Pow, (**)) ]
 
@@ -36,6 +50,12 @@ data ExprTree = NodeUnary !UnaryFunc !ExprTree
                 | LeafVar !Var
                 | LeafConst !Const
     deriving (Show, Eq)
+
+instance Formattable ExprTree where
+    pretty (LeafVar (Var x)) = x
+    pretty (LeafConst c) = show c
+    pretty (NodeUnary f t) = pretty f ++ " (" ++ pretty t ++ ")"
+    pretty (NodeBinary f l r) = "(" ++ pretty l ++ pretty f ++ pretty r ++ ")"
 
 intLeaf = LeafConst . fromInteger
 realLeaf = LeafConst
@@ -77,15 +97,13 @@ numNodes (NodeUnary _ t) = 1 + numNodes t
 numNodes (NodeBinary _ l r) = 1 + numNodes l + numNodes r
 
 evalTree :: [(String, Double)] -> ExprTree -> Double
-evalTree _ (LeafConst c) = c
-evalTree !vars !(LeafVar (Var v)) | Just c <- lookup v vars = c
-                                | otherwise = error $ "Unknown var " ++ v
-evalTree !vars !(NodeUnary f t) | Just f' <- lookup f unaryOps = f' $ evalTree vars t
-                              | otherwise = error $ "Unknown uf " ++ show f
-evalTree !vars !(NodeBinary f l r) | Just f' <- lookup f binaryOps = (el `using` rdeepseq) `par` (er `using` rdeepseq) `pseq` f' el er
-                                 | otherwise = error $ "Unknown bf " ++ show f
-                                    where el = evalTree vars l
-                                          er = evalTree vars r
+evalTree _ !(LeafConst !c) = c
+evalTree !vars !(LeafVar !(Var !v)) | Just !c <- lookup v vars = c
+                                   | otherwise = error $ "Unknown var " ++ v
+evalTree !vars !(NodeUnary !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTree vars t
+                                  | otherwise = error $ "Unknown uf " ++ show f
+evalTree !vars !(NodeBinary !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
+                                      | otherwise = error $ "Unknown bf " ++ show f
 
 atNodeBin :: (Int -> Int -> ExprTree -> ExprTree) -> Int -> Int -> (ExprTree, ExprTree) -> ExprTree
 atNodeBin f i n (l, r) | nl +i >= n = f (i + 1) n l

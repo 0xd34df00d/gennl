@@ -13,6 +13,7 @@ import Random
 import ExprTree
 import ExprIncidenceMatrix
 import SupportUtils
+import FormatClass
 
 type TestSample = ([Double], Double)
 
@@ -34,7 +35,7 @@ data RandomGen g => GAState g a = GAState {
         fits :: [(a, Double)]
     }
 
-class (Eq a, Show a) => GAble a where
+class (Eq a, Show a, Formattable a) => GAble a where
     mutate :: RandomGen g => GAState g a -> g -> a -> a
     crossover :: RandomGen g => GAState g a -> g -> (a, a) -> (a, a)
     compute :: [(String, Double)] -> a -> Double
@@ -77,20 +78,20 @@ iterateGA = execState chain
 type MGState g a = State (GAState g a) ()
 
 tickGA :: (GAble a, RandomGen g) => MGState g a
-tickGA = get >>= (\st -> put $ st { iter = iter st + 1 } )
+tickGA = get >>= (\st -> (iter st + 1, length $ ppl st, map pretty (drop (length (fits st) - 5) (fits st))) `traceShow` put $ st { iter = iter st + 1 } )
 
 assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
         st <- get
         let ppls = ppl st
-        put st { fits = zip ppls (map (getFit st) ppls) }
+        put st { fits = zip ppls (withStrategy (parListChunk 5 rdeepseq) $ map (getFit st) ppls) }
     where getFit st a | Just x <- lookup a (fits st) = x
                       | otherwise = getChromoFit a st
 
 getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> Double
 getChromoFit a st = 1 / (sum xs + 1)
     where xs = map f (testSet c)
-          f smp = abs (sqrt (snd smp - compute (zip (vars c) (fst smp)) a))
+          f smp = sqrt (abs (snd smp - compute (zip (vars c) (fst smp)) a))
           c = cfg st
 
 cleanBad :: (GAble a, RandomGen g) => MGState g a
@@ -98,9 +99,15 @@ cleanBad = do
         st <- get
         let ppls' = ppl st
         let fs = fits st
-        let ppls = filter (\a -> not $ isNaN $ fromMaybe (0/0) (lookup a fs)) ppls'
+        let ppls = delConseq (\a b -> lookup a fs == lookup b fs) $ filter (\a -> not $ isNaN $ fromMaybe (0/0) (lookup a fs)) ppls'
         put st { ppl = drop (diff ppls st) ppls }
             where diff p st = length p - optNum (cfg st)
+
+delConseq :: (a -> a -> Bool) -> [a] -> [a]
+delConseq _ [] = []
+delConseq p (x:xs) = reverse $ snd (foldl' step (x, [x]) xs)
+    where step l@(x', r) x | p x x' = l
+                           | otherwise = (x, x : r)
 
 sortPpl :: (RandomGen g, GAble a) => MGState g a
 sortPpl = get >>= (\st -> put $ st { ppl = map fst (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) } )

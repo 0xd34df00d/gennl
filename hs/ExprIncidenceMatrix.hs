@@ -12,6 +12,8 @@ import SupportUtils
 import Random
 import Control.Arrow
 
+import FormatClass
+
 data NodeType = BinNode !BinaryFunc
                 | UnNode !UnaryFunc
                 | LeafCNode !Const
@@ -30,6 +32,8 @@ data IncMatrix = IncMatrix {
 
 instance Eq IncMatrix where
     a == b = ops a == ops b
+
+instance Formattable IncMatrix
 
 data VecState = VecState {
         pos :: Int,

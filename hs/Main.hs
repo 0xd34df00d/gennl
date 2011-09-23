@@ -28,10 +28,10 @@ runStuff' recs num g = (a, fit, iter st, map snd $ fits st)
           cfg = defConfig :: GAConfig ExprTree
           (a, fit, st) = runGA defGA
 
-genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j, f i j ] | i <- [1..ni], j <- [1..nj] ]
+genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j, f i j ] | i <- [0.1,0.2..ni/10], j <- [0.1,0.2..nj/10] ]
 
 main' num pts = do
-    let recs = parseCSV (genSynth (\x y -> x * y + x * x * y * y - x * x) pts pts ++ "\r\n")
+    let recs = parseCSV (genSynth (\x y -> x * y + x * x * y * y) pts pts ++ "\r\n")
     g <- newStdGen
     print $ runStuff recs num g
 
