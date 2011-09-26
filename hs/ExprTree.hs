@@ -107,8 +107,8 @@ evalTree !vars !(NodeUnary !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTre
 evalTree !vars !(NodeBinary !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
                                       | otherwise = error $ "Unknown bf " ++ show f
 
-evalTreeFl :: [(String, a)] -> ExprTree -> a
-evalTreeFl vars t = lift $ evalTree (map (second (fromRational)) vars) t
+evalTreeFl :: [(String, Dual a Double)] -> ExprTree -> Dual a Double
+evalTreeFl vars t = lift $ evalTree (map (second realToFrac) vars) t
 
 atNodeBin :: (Int -> Int -> ExprTree -> ExprTree) -> Int -> Int -> (ExprTree, ExprTree) -> ExprTree
 atNodeBin f i n (l, r) | nl +i >= n = f (i + 1) n l
