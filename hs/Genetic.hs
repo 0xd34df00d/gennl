@@ -91,7 +91,7 @@ assessPpl = do
 getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> Double
 getChromoFit a st = 1 / (sum xs + 1)
     where xs = map f (testSet c)
-          f smp = sqrt (abs (snd smp - compute (zip (vars c) (fst smp)) a))
+          f smp = sqrt ((snd smp - compute (zip (vars c) (fst smp)) a) ** 2)
           c = cfg st
 
 cleanBad :: (GAble a, RandomGen g) => MGState g a
