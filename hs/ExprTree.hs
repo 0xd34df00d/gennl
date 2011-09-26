@@ -39,7 +39,7 @@ instance Formattable BinaryFunc where
     pretty Minus = "-"
     pretty Mul = "*"
     pretty Div = "/"
-    pretty Pow = "^"
+    pretty Pow = "**"
 
 binaryOps = [ (Plus, (+)), (Minus, (-)), (Mul, (*)), (Div, (/)), (Pow, (**)) ]
 
