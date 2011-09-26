@@ -1,4 +1,4 @@
-module FormatClass
+module Formattable
     where
 
 class Show a => Formattable a where

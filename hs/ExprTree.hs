@@ -12,7 +12,7 @@ import Control.Arrow
 import Data.List
 
 import SupportUtils
-import FormatClass
+import Formattable
 
 type Const = Double
 
@@ -74,7 +74,7 @@ randExprTree vars cpx g = randExprTree' vars g (0, cpx)
 randExprTree' :: (RandomGen g) => [String] -> g -> (Int, Int) -> (ExprTree, g)
 randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.12 0.30 = (LeafConst (dice * 50), g5)
                                | dh /= 0 && thr dice 0.30 0.30 = (LeafVar $ Var $ randElem vars g2, g5)
-                               | dice <= 0.60 = (NodeBinary
+                               | dice <= 0.80 = (NodeBinary
                                                     (randElem binaryOpsOnly g2)
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx))
                                                     (fst $ randExprTree' vars g4 (dh + 1, cpx)),

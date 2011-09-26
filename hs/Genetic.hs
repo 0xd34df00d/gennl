@@ -13,7 +13,7 @@ import Random
 import ExprTree
 import ExprIncidenceMatrix
 import SupportUtils
-import FormatClass
+import Formattable
 
 type TestSample = ([Double], Double)
 

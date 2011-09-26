@@ -12,7 +12,7 @@ import SupportUtils
 import Random
 import Control.Arrow
 
-import FormatClass
+import Formattable
 
 data NodeType = BinNode !BinaryFunc
                 | UnNode !UnaryFunc

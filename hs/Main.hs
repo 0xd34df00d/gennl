@@ -2,6 +2,7 @@ import System.Environment
 import Control.Arrow
 import Data.List
 import Data.Either
+import Random
 import Debug.Trace
 
 import ExprTree
@@ -9,8 +10,7 @@ import NaturalParser
 import ExprIncidenceMatrix
 import Genetic
 import CSVParser
-import Random
-
+import Formattable
 
 applyP f s = case s of
         Right t -> Right $ f t
@@ -23,7 +23,7 @@ incMatrix s = applyP' toIncMatrix s
 runStuff (Left m) _ _ = error $ show m
 runStuff (Right recs) num g = runStuff' (map (map read) recs) num g
 
-runStuff' recs num g = (a, fit, iter st, map snd $ fits st)
+runStuff' recs num g = (pretty a, fit, iter st, map snd $ fits st)
     where defGA = initPpl num $ initGA (cfg { vars = ["x", "y"], testSet = map (take 2 &&& head . drop 2) recs, optNum = num } ) g
           cfg = defConfig :: GAConfig ExprTree
           (a, fit, st) = runGA defGA
