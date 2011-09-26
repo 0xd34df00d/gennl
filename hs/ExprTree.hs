@@ -10,6 +10,8 @@ import Data.Functor ((<$>))
 import Random
 import Control.Arrow
 import Data.List
+import Numeric.FAD
+import GHC.Float
 
 import SupportUtils
 import Formattable
@@ -74,7 +76,7 @@ randExprTree vars cpx g = randExprTree' vars g (0, cpx)
 randExprTree' :: (RandomGen g) => [String] -> g -> (Int, Int) -> (ExprTree, g)
 randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.12 0.30 = (LeafConst (dice * 50), g5)
                                | dh /= 0 && thr dice 0.30 0.30 = (LeafVar $ Var $ randElem vars g2, g5)
-                               | dice <= 0.80 = (NodeBinary
+                               | dice <= 0.90 = (NodeBinary
                                                     (randElem binaryOpsOnly g2)
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx))
                                                     (fst $ randExprTree' vars g4 (dh + 1, cpx)),
@@ -104,6 +106,9 @@ evalTree !vars !(NodeUnary !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTre
                                   | otherwise = error $ "Unknown uf " ++ show f
 evalTree !vars !(NodeBinary !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
                                       | otherwise = error $ "Unknown bf " ++ show f
+
+evalTreeFl :: [(String, a)] -> ExprTree -> a
+evalTreeFl vars t = lift $ evalTree (map (second (fromRational)) vars) t
 
 atNodeBin :: (Int -> Int -> ExprTree -> ExprTree) -> Int -> Int -> (ExprTree, ExprTree) -> ExprTree
 atNodeBin f i n (l, r) | nl +i >= n = f (i + 1) n l
