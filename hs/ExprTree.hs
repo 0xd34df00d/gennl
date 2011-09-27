@@ -142,6 +142,25 @@ repSubTree' i n r (NodeBinary f t1 t2) = NodeBinary f t1' t2'
     where (t1', t2') = atNodeBin2 (\i n t -> repSubTree' i n r t) i n (t1, t2)
 repSubTree' i n r (NodeUnary f t) = NodeUnary f (repSubTree' (i + 1) n r t)
 
+varTreeConsts :: ExprTree a -> (ExprTree a, [(String, a)])
+varTreeConsts = (\(x, y, z) -> (x, y)) . varTreeConsts' 0
+
+varTreeConsts' :: Int -> ExprTree a -> (ExprTree a, [(String, a)], Int)
+varTreeConsts' n t@(LeafVar _) = (t, [], n)
+varTreeConsts' n t@(LeafConst c) = (LeafVar (Var name), [(name, c)], n + 1)
+    where name = '_' : show n
+varTreeConsts' n (NodeUnary f t) = (\(x, y, z) -> (NodeUnary f x, y, z)) (varTreeConsts' n t)
+varTreeConsts' n (NodeBinary f l r) = (NodeBinary f l' r', lrep ++ rrep, rpos)
+    where (l', lrep, lpos) = varTreeConsts' n l
+          (r', rrep, rpos) = varTreeConsts' lpos r
+
+fixTreeVars :: [(String, a)] -> ExprTree a -> ExprTree a
+fixTreeVars vals t@(LeafConst _) = t
+fixTreeVars vals t@(LeafVar (Var v)) | Just v' <- lookup v vals = LeafConst v'
+                                     | otherwise = t
+fixTreeVars vals (NodeUnary f t) = NodeUnary f (fixTreeVars vals t)
+fixTreeVars vals (NodeBinary f l r) = NodeBinary f (fixTreeVars vals l) (fixTreeVars vals r)
+
 walkFail :: String -> Int -> Int -> a
 walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n
 
