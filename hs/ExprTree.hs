@@ -1,5 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module ExprTree
     where
@@ -15,8 +18,6 @@ import GHC.Float
 
 import SupportUtils
 import Formattable
-
-type Const = Double
 
 data Var = Var String
     deriving (Show, Eq)
@@ -47,13 +48,16 @@ binaryOps = [ (Plus, (+)), (Minus, (-)), (Mul, (*)), (Div, (/)), (Pow, (**)) ]
 
 binaryOpsOnly = map fst binaryOps
 
-data ExprTree = NodeUnary !UnaryFunc !ExprTree
-                | NodeBinary !BinaryFunc !ExprTree !ExprTree
+data ExprTree a = NodeUnary !UnaryFunc !(ExprTree a)
+                | NodeBinary !BinaryFunc !(ExprTree a) !(ExprTree a)
                 | LeafVar !Var
-                | LeafConst !Const
+                | LeafConst !a
     deriving (Show, Eq)
 
-instance Formattable ExprTree where
+class (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
+instance (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
+
+instance (Show a) => Formattable (ExprTree a) where
     pretty (LeafVar (Var x)) = x
     pretty (LeafConst c) = show c
     pretty (NodeUnary f t) = pretty f ++ " (" ++ pretty t ++ ")"
@@ -70,13 +74,13 @@ unaryNode s = NodeUnary <$> lookup s al
 binaryNode s = NodeBinary <$> lookup s al
     where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
 
-randExprTree :: (RandomGen g) => [String] -> Int -> g -> (ExprTree, g)
+randExprTree :: (RandomGen g, SuitableConst a) => [String] -> Int -> g -> (ExprTree a, g)
 randExprTree vars cpx g = randExprTree' vars g (0, cpx)
 
-randExprTree' :: (RandomGen g) => [String] -> g -> (Int, Int) -> (ExprTree, g)
+randExprTree' :: (RandomGen g, SuitableConst a) => [String] -> g -> (Int, Int) -> (ExprTree a, g)
 randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.12 0.30 = (LeafConst (dice * 50), g5)
                                | dh /= 0 && thr dice 0.30 0.30 = (LeafVar $ Var $ randElem vars g2, g5)
-                               | dice <= 0.90 = (NodeBinary
+                               | dice <= 0.98 = (NodeBinary
                                                     (randElem binaryOpsOnly g2)
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx))
                                                     (fst $ randExprTree' vars g4 (dh + 1, cpx)),
@@ -85,20 +89,20 @@ randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.12 0.30 = (LeafConst (dic
                                                     (randElem unaryOpsOnly g2)
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx)),
                                                  g5)
-    where (dice :: Double, _) = random g1
+    where (dice, _) = random g1
           (g0:g1:g2:g3:g4:g5:_) = take 6 (rndGens g)
           randElem xs g = xs !! fst (randomR (0, length xs - 1) g)
           (?) a b c | a = b
                     | otherwise = c
           thr dice t m = dice <= ((dh < cpx) ? t $ t / m)
 
-numNodes :: ExprTree -> Int
+numNodes :: ExprTree a -> Int
 numNodes (LeafVar _) = 1
 numNodes (LeafConst _) = 1
 numNodes (NodeUnary _ t) = 1 + numNodes t
 numNodes (NodeBinary _ l r) = 1 + numNodes l + numNodes r
 
-evalTree :: [(String, Double)] -> ExprTree -> Double
+evalTree :: Floating a => [(String, a)] -> ExprTree a -> a
 evalTree _ !(LeafConst !c) = c
 evalTree !vars !(LeafVar !(Var !v)) | Just !c <- lookup v vars = c
                                    | otherwise = error $ "Unknown var " ++ v
@@ -107,33 +111,30 @@ evalTree !vars !(NodeUnary !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTre
 evalTree !vars !(NodeBinary !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
                                       | otherwise = error $ "Unknown bf " ++ show f
 
-evalTreeFl :: [(String, Dual a Double)] -> ExprTree -> Dual a Double
-evalTreeFl vars t = lift $ evalTree (map (second realToFrac) vars) t
-
-atNodeBin :: (Int -> Int -> ExprTree -> ExprTree) -> Int -> Int -> (ExprTree, ExprTree) -> ExprTree
+atNodeBin :: (Int -> Int -> ExprTree a -> ExprTree a) -> Int -> Int -> (ExprTree a, ExprTree a) -> ExprTree a
 atNodeBin f i n (l, r) | nl +i >= n = f (i + 1) n l
                        | otherwise = f (i + nl + 1) n r
                           where nl = numNodes l
 
-atNodeBin2 :: (Int -> Int -> ExprTree -> ExprTree) -> Int -> Int -> (ExprTree, ExprTree) -> (ExprTree, ExprTree)
+atNodeBin2 :: (Int -> Int -> ExprTree a -> ExprTree a) -> Int -> Int -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)
 atNodeBin2 f i n (l, r) | nl +i >= n = (f (i + 1) n l, r)
                         | otherwise = (l, f (i + nl + 1) n r)
                           where nl = numNodes l
 
-subTree :: Int -> ExprTree -> ExprTree
+subTree :: Int -> ExprTree a -> ExprTree a
 subTree = subTree' 0
 
-subTree' :: Int -> Int -> ExprTree -> ExprTree
+subTree' :: Int -> Int -> ExprTree a -> ExprTree a
 subTree' i n t | i == n = t
 subTree' i n (LeafVar _) = walkFail "subTree: var node" i n
 subTree' i n (LeafConst _) = walkFail "subTree: const node" i n
 subTree' i n (NodeBinary _ l r) = atNodeBin subTree' i n (l, r)
 subTree' i n (NodeUnary _ t) = subTree' (i + 1) n t
 
-repSubTree :: Int -> ExprTree -> ExprTree -> ExprTree
+repSubTree :: Int -> ExprTree a -> ExprTree a -> ExprTree a
 repSubTree = repSubTree' 0
 
-repSubTree' :: Int -> Int -> ExprTree -> ExprTree -> ExprTree
+repSubTree' :: Int -> Int -> ExprTree a -> ExprTree a -> ExprTree a
 repSubTree' i n r _ | i == n = r
 repSubTree' i n r (LeafVar _) = walkFail "repSubTree: var node" i n
 repSubTree' i n r (LeafConst _) = walkFail "repSubTree: const node" i n
@@ -145,7 +146,7 @@ walkFail :: String -> Int -> Int -> a
 walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n
 
 -- Better to place terminating optimizations at the top, obviously
-simplifyTree :: ExprTree -> ExprTree
+simplifyTree :: (Floating a, SuitableConst a) => ExprTree a -> ExprTree a
 simplifyTree (NodeBinary Pow _ (LeafConst 0.0)) = LeafConst 1.0
 simplifyTree (NodeBinary Pow l@(LeafConst 1.0) _) = l
 simplifyTree (NodeBinary Mul l@(LeafConst 0.0) _) = l

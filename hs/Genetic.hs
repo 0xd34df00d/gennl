@@ -1,3 +1,8 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 module Genetic
     where
 
@@ -11,20 +16,18 @@ import Debug.Trace
 import Data.Ord (comparing)
 import Random
 import ExprTree
-import ExprIncidenceMatrix
+--import ExprIncidenceMatrix
 import SupportUtils
 import Formattable
-
-type TestSample = ([Double], Double)
 
 data GAConfig a = GAConfig {
         unaryOpsPool :: [UnaryFunc],
         binaryOpsPool :: [BinaryFunc],
         vars :: [String],
-        testSet :: [TestSample],                     -- The order of doubles should be the same as in vars.
+        testSet :: [([ComputeRes a], ComputeRes a)],                     -- The order of doubles should be the same as in vars.
         rndCpx :: Int,
         optNum :: Int,
-        stopF :: [a] -> Int -> Double -> Bool
+        stopF :: [a] -> Int -> ComputeRes a -> Bool
     }
 
 data RandomGen g => GAState g a = GAState {
@@ -32,13 +35,14 @@ data RandomGen g => GAState g a = GAState {
         randGen :: g,
         iter :: Int,
         ppl :: [a],
-        fits :: [(a, Double)]
+        fits :: [(a, ComputeRes a)]
     }
 
-class (Eq a, Show a, Formattable a) => GAble a where
+class (Eq a, Show a, Formattable a, Ord (ComputeRes a), RealFloat (ComputeRes a), Formattable (ComputeRes a)) => GAble a where
+    type ComputeRes a :: *
     mutate :: RandomGen g => GAState g a -> g -> a -> a
     crossover :: RandomGen g => GAState g a -> g -> (a, a) -> (a, a)
-    compute :: [(String, Double)] -> a -> Double
+    compute :: [(String, ComputeRes a)] -> a -> ComputeRes a
     randGAInst :: RandomGen g => [String] -> Int -> g -> (a, g)
     complexity :: a -> Double
     complexity _ = 1.0
@@ -63,7 +67,8 @@ initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
-    where chain = assessPpl >>
+    where chain = --optimizeConsts >>
+                  assessPpl >>
                   sortPpl >>
                   cleanBad >>
                   cleanupFits >>
@@ -80,15 +85,18 @@ type MGState g a = State (GAState g a) ()
 tickGA :: (GAble a, RandomGen g) => MGState g a
 tickGA = get >>= (\st -> (iter st + 1, length $ ppl st, map pretty (drop (length (fits st) - 5) (fits st))) `traceShow` put $ st { iter = iter st + 1 } )
 
+optimizeConsts :: MGState g a
+optimizeConsts = undefined
+
 assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
         st <- get
         let ppls = ppl st
-        put st { fits = zip ppls (withStrategy (parListChunk 5 rdeepseq) $ map (getFit st) ppls) }
+        put st { fits = zip ppls (map (getFit st) ppls) }
     where getFit st a | Just x <- lookup a (fits st) = x
                       | otherwise = getChromoFit a st
 
-getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> Double
+getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> ComputeRes a
 getChromoFit a st = 1 / (sum xs + 1)
     where xs = map f (testSet c)
           f smp = sqrt ((snd smp - compute (zip (vars c) (fst smp)) a) ** 2)
@@ -140,15 +148,16 @@ crossoverSome = do
                 where ns = filter (uncurry (/=))
                       lastN n xs = drop (length xs - n) xs
 
-runGA :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
+runGA :: (RandomGen g, GAble a) => GAState g a -> (a, ComputeRes a, GAState g a)
 runGA = runGA' . iterateGA
 
-runGA' :: (RandomGen g, GAble a) => GAState g a -> (a, Double, GAState g a)
+runGA' :: (RandomGen g, GAble a) => GAState g a -> (a, ComputeRes a, GAState g a)
 runGA' st = if stopF (cfg st) (ppl st) (iter st) maxFitness
             then (best, maxFitness, st)
             else runGA' $ iterateGA st
     where (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st))
 
+{-
 instance GAble IncMatrix where
     mutate st g m = m'
         where (t1:t2:t3:_, gen) = nRands g 3
@@ -175,19 +184,21 @@ instance GAble IncMatrix where
                           m2s = cols $ numMat m2
     compute = evalMatrix
     randGAInst = randIncMatrix
+    -}
 
-instance GAble ExprTree where
+instance (SuitableConst a, Num a, Real a, Floating a, Formattable a, RealFloat a) => GAble (ExprTree a) where
+    type ComputeRes (ExprTree a) = a
     mutate = mutateTree
     crossover = coTrees
-    compute = evalTree
+    compute vars tree = evalTree (map (second $ realToFrac) vars) tree
     randGAInst = randExprTree
     complexity = fromIntegral . numNodes
 
-mutateTree :: (RandomGen g) => GAState g ExprTree -> g -> ExprTree -> ExprTree
+mutateTree :: (RandomGen g, Random a, Num a) => GAState g (ExprTree a) -> g -> ExprTree a -> ExprTree a
 mutateTree st g t = mutateTree' st g1 t (fst $ randomR (0, numNodes t - 1) g2) 0
     where (g1, g2) = split g
 
-mutateTree' :: (RandomGen g) => GAState g ExprTree -> g -> ExprTree -> Int -> Int -> ExprTree
+mutateTree' :: (RandomGen g, Random a, Num a) => GAState g (ExprTree a) -> g -> ExprTree a -> Int -> Int -> ExprTree a
 mutateTree' st g (NodeBinary f l r) n i | n == i = NodeBinary (mutGene f (binaryOpsPool $ cfg st) g) l r
                                         | nl + i >= n = NodeBinary f (mutateTree' st g l n (i + 1)) r
                                         | otherwise = NodeBinary f l (mutateTree' st g r n (i + nl + 1))
@@ -203,7 +214,7 @@ mutGene :: (Eq a, RandomGen g) => a -> [a] -> g -> a
 mutGene ex vars g = fi !! fst (randomR (0, length fi - 1) g)
     where fi = filter (/= ex) vars
 
-coTrees :: (RandomGen g) => GAState g ExprTree -> g -> (ExprTree, ExprTree) -> (ExprTree, ExprTree)
+coTrees :: (RandomGen g) => GAState g (ExprTree a) -> g -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)
 coTrees st g (t1, t2) = (t1', t2')
     where gs = rndGens g
           p1 = getP (gs !! 0) t1
