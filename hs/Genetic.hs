@@ -44,6 +44,8 @@ class (Eq a, Show a, Formattable a, Ord (ComputeRes a), RealFloat (ComputeRes a)
     crossover :: RandomGen g => GAState g a -> g -> (a, a) -> (a, a)
     compute :: [(String, ComputeRes a)] -> a -> ComputeRes a
     randGAInst :: RandomGen g => [String] -> Int -> g -> (a, g)
+    variateConsts :: a -> (a, [(String, ComputeRes a)])
+    fixVars :: [(String, ComputeRes a)] -> a -> a
     complexity :: a -> Double
     complexity _ = 1.0
 
@@ -190,9 +192,11 @@ instance (SuitableConst a, Num a, Real a, Floating a, Formattable a, RealFloat a
     type ComputeRes (ExprTree a) = a
     mutate = mutateTree
     crossover = coTrees
-    compute vars tree = evalTree (map (second $ realToFrac) vars) tree
+    compute = evalTree
     randGAInst = randExprTree
     complexity = fromIntegral . numNodes
+    variateConsts = varTreeConsts
+    fixVars = fixTreeVars
 
 mutateTree :: (RandomGen g, Random a, Num a) => GAState g (ExprTree a) -> g -> ExprTree a -> ExprTree a
 mutateTree st g t = mutateTree' st g1 t (fst $ randomR (0, numNodes t - 1) g2) 0
