@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Genetic
     where
@@ -12,9 +13,13 @@ import Control.Parallel.Strategies
 import Data.Packed.Matrix
 import Data.List
 import Data.Maybe
+import Data.Functor ((<$>))
+import Numeric.FAD
+import Numeric.GSL.Fitting
 import Debug.Trace
 import Data.Ord (comparing)
 import Random
+
 import ExprTree
 --import ExprIncidenceMatrix
 import SupportUtils
@@ -46,8 +51,13 @@ class (Eq a, Show a, Formattable a, Ord (ComputeRes a), RealFloat (ComputeRes a)
     randGAInst :: RandomGen g => [String] -> Int -> g -> (a, g)
     variateConsts :: a -> (a, [(String, ComputeRes a)])
     fixVars :: [(String, ComputeRes a)] -> a -> a
+    jacForConsts :: a -> ([String], [String]) -> [Double] -> [Double] -> [[Double]]
     complexity :: a -> Double
     complexity _ = 1.0
+    res2double :: ComputeRes a -> Double
+    res2double = realToFrac
+    double2res :: Double -> ComputeRes a
+    double2res = realToFrac
 
 defConfig :: (GAble a) => GAConfig a
 defConfig = GAConfig
@@ -57,7 +67,7 @@ defConfig = GAConfig
                 []
                 7
                 200
-                (\_ its maxF -> its > 100 || maxF > 0.95)
+                (\_ its maxF -> its > 10 || maxF > 0.95)
 
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
 initGA c g = GAState c g 0 [] []
@@ -69,7 +79,7 @@ initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
-    where chain = --optimizeConsts >>
+    where chain = optimizePplConsts >>
                   assessPpl >>
                   sortPpl >>
                   cleanBad >>
@@ -87,8 +97,25 @@ type MGState g a = State (GAState g a) ()
 tickGA :: (GAble a, RandomGen g) => MGState g a
 tickGA = get >>= (\st -> (iter st + 1, length $ ppl st, map pretty (drop (length (fits st) - 5) (fits st))) `traceShow` put $ st { iter = iter st + 1 } )
 
-optimizeConsts :: MGState g a
-optimizeConsts = undefined
+optimizePplConsts :: (GAble a, RandomGen g) => MGState g a
+optimizePplConsts = do
+    st <- get
+    put st { ppl = map (optimizeConsts (cfg st)) (ppl st) }
+
+runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
+runOpt vars dat cv a = realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac <$> a, [realToFrac b])) <$> dat) (second realToFrac <$> cv) a
+
+runOpt' :: (GAble a) => [String] -> [([Double], [Double])] -> [(String, Double)] -> a -> [Double]
+runOpt' vars dat cv a = fst $ fitModel 1E-4 1E-4 10 (gaModel (a, cvNames, vars), jacForConsts a (cvNames, vars)) dat (map snd cv)
+    where cvNames = fst <$> cv
+
+gaModel :: (GAble a) => (a, [String], [String]) -> [Double] -> [Double] -> [Double]
+gaModel !(!a, !cNames, !vNames) !consts !vars = [realToFrac $ compute ((second realToFrac) <$> (zip cNames consts ++ zip vNames vars)) a]
+
+optimizeConsts :: (GAble a) => GAConfig a -> a -> a
+optimizeConsts cfg a = fixVars (zip (map fst cv) res) varred
+    where (varred, cv) = variateConsts a
+          res = runOpt (vars cfg) (testSet cfg) cv varred
 
 assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
@@ -197,6 +224,7 @@ instance (SuitableConst a, Num a, Real a, Floating a, Formattable a, RealFloat a
     complexity = fromIntegral . numNodes
     variateConsts = varTreeConsts
     fixVars = fixTreeVars
+    jacForConsts = varredTreeJac
 
 mutateTree :: (RandomGen g, Random a, Num a) => GAState g (ExprTree a) -> g -> ExprTree a -> ExprTree a
 mutateTree st g t = mutateTree' st g1 t (fst $ randomR (0, numNodes t - 1) g2) 0

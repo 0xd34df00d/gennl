@@ -15,6 +15,7 @@ import Control.Arrow
 import Data.List
 import Numeric.FAD
 import GHC.Float
+import Debug.Trace
 
 import SupportUtils
 import Formattable
@@ -105,7 +106,7 @@ numNodes (NodeBinary _ l r) = 1 + numNodes l + numNodes r
 evalTree :: Floating a => [(String, a)] -> ExprTree a -> a
 evalTree _ !(LeafConst !c) = c
 evalTree !vars !(LeafVar !(Var !v)) | Just !c <- lookup v vars = c
-                                   | otherwise = error $ "Unknown var " ++ v
+                                    | otherwise = error $ "Unknown var " ++ v
 evalTree !vars !(NodeUnary !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTree vars t
                                   | otherwise = error $ "Unknown uf " ++ show f
 evalTree !vars !(NodeBinary !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
@@ -160,6 +161,15 @@ fixTreeVars vals t@(LeafVar (Var v)) | Just v' <- lookup v vals = LeafConst v'
                                      | otherwise = t
 fixTreeVars vals (NodeUnary f t) = NodeUnary f (fixTreeVars vals t)
 fixTreeVars vals (NodeBinary f l r) = NodeBinary f (fixTreeVars vals l) (fixTreeVars vals r)
+
+morphTreeConsts :: (a -> b) -> ExprTree a -> ExprTree b
+morphTreeConsts c (LeafConst ct) = LeafConst $ c ct
+morphTreeConsts _ (LeafVar v) = LeafVar v
+morphTreeConsts c (NodeUnary f t) = NodeUnary f (morphTreeConsts c t)
+morphTreeConsts c (NodeBinary f l r) = NodeBinary f (morphTreeConsts c l) (morphTreeConsts c r)
+
+varredTreeJac :: (Real a, Floating a, Fractional a) => ExprTree a -> ([String], [String]) -> [Double] -> [Double] -> [[Double]]
+varredTreeJac !t !(!cNames, !vNames) !consts !vars = ((<$>) . (<$>)) realToFrac $ jacobian (\cts -> [evalTree (zip cNames cts ++ zip vNames (realToFrac <$> vars)) (morphTreeConsts realToFrac t)]) (realToFrac <$> consts)
 
 walkFail :: String -> Int -> Int -> a
 walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n

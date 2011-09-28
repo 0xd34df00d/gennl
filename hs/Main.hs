@@ -34,14 +34,16 @@ runStuff' recs num g = (pretty a, fit, iter st, map snd $ fits st)
           cfg = defConfig :: GAConfig (ExprTree (Double))
           (a, fit, st) = runGA defGA
 
-genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j, f i j ] | i <- [0.1,0.2..ni/10], j <- [0.1,0.2..nj/10] ]
+genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j, f i j ] | i <- [1..ni], j <- [1..nj] ]
 
+main' :: Int -> Double -> IO ()
 main' num pts = do
-    let recs = parseCSV (genSynth (\x y -> x * y + x * x * y * y) pts pts ++ "\r\n")
+    let recs = parseCSV (genSynth (\x y -> (exp 1) ** (x / y) + 1) pts pts ++ "\r\n")
+    --file <- readFile "options.dat.txt"
+    --let recs = parseCSV file
     g <- newStdGen
     print $ runStuff recs num g
 
 main = do
     args <- getArgs
     main' (read $ args !! 0) (read $ args !! 1)
-    --file <- readFile "options.dat.txt"
