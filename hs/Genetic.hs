@@ -40,7 +40,8 @@ data RandomGen g => GAState g a = GAState {
         randGen :: g,
         iter :: Int,
         ppl :: [a],
-        fits :: [(a, ComputeRes a)]
+        fits :: [(a, ComputeRes a)],
+        optimized :: [a]
     }
 
 class (Eq a, Show a, Formattable a, Ord (ComputeRes a), RealFloat (ComputeRes a), Formattable (ComputeRes a)) => GAble a where
@@ -67,10 +68,10 @@ defConfig = GAConfig
                 []
                 7
                 200
-                (\_ its maxF -> its > 10 || maxF > 0.95)
+                (\_ its maxF -> its > 100 || maxF > 0.95)
 
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
-initGA c g = GAState c g 0 [] []
+initGA c g = GAState c g 0 [] [] []
 
 initPpl :: (RandomGen g, GAble a) => Int -> GAState g a -> GAState g a
 initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c)) g1, randGen = g2 }
@@ -100,13 +101,16 @@ tickGA = get >>= (\st -> (iter st + 1, length $ ppl st, map pretty (drop (length
 optimizePplConsts :: (GAble a, RandomGen g) => MGState g a
 optimizePplConsts = do
     st <- get
-    put st { ppl = map (optimizeConsts (cfg st)) (ppl st) }
+    let opted = optimized st
+    let unopt = ppl st \\ opted
+    let opt = map (optimizeConsts (cfg st)) unopt
+    put st { ppl = opted ++ opt, optimized = opted ++ opt }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
 runOpt vars dat cv a = realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac <$> a, [realToFrac b])) <$> dat) (second realToFrac <$> cv) a
 
 runOpt' :: (GAble a) => [String] -> [([Double], [Double])] -> [(String, Double)] -> a -> [Double]
-runOpt' vars dat cv a = fst $ fitModel 1E-4 1E-4 10 (gaModel (a, cvNames, vars), jacForConsts a (cvNames, vars)) dat (map snd cv)
+runOpt' vars dat cv a = fst $ fitModel 1E-4 1E-4 5 (gaModel (a, cvNames, vars), jacForConsts a (cvNames, vars)) dat (map snd cv)
     where cvNames = fst <$> cv
 
 gaModel :: (GAble a) => (a, [String], [String]) -> [Double] -> [Double] -> [Double]
