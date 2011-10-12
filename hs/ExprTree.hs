@@ -9,6 +9,7 @@ module ExprTree
 
 import Control.Parallel
 import Control.Parallel.Strategies
+import Control.DeepSeq
 import Data.Functor ((<$>))
 import Random
 import Control.Arrow
@@ -54,6 +55,8 @@ data ExprTree a = NodeUnary !UnaryFunc !(ExprTree a)
                 | LeafVar !Var
                 | LeafConst !a
     deriving (Show, Eq)
+
+instance NFData a => NFData (ExprTree a)
 
 class (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
 instance (Fractional a, Random a, Ord a, Eq a) => SuitableConst a

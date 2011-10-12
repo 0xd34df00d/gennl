@@ -10,6 +10,7 @@ module Genetic
 import Control.Monad.State
 import Control.Arrow
 import Control.Parallel.Strategies
+import Control.DeepSeq
 import Data.Packed.Matrix
 import Data.List
 import Data.Maybe
@@ -24,6 +25,7 @@ import ExprTree
 --import ExprIncidenceMatrix
 import SupportUtils
 import Formattable
+import qualified LevMar
 
 data GAConfig a = GAConfig {
         unaryOpsPool :: [UnaryFunc],
@@ -44,7 +46,7 @@ data RandomGen g => GAState g a = GAState {
         optimized :: [a]
     }
 
-class (Eq a, Show a, Formattable a, Ord (ComputeRes a), RealFloat (ComputeRes a), Formattable (ComputeRes a)) => GAble a where
+class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (ComputeRes a), RealFloat (ComputeRes a), Formattable (ComputeRes a)) => GAble a where
     type ComputeRes a :: *
     mutate :: RandomGen g => GAState g a -> g -> a -> a
     crossover :: RandomGen g => GAState g a -> g -> (a, a) -> (a, a)
@@ -80,7 +82,7 @@ initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
-    where chain = optimizePplConsts >>
+    where chain = --optimizePplConsts >>
                   assessPpl >>
                   sortPpl >>
                   cleanBad >>
@@ -103,7 +105,7 @@ optimizePplConsts = do
     st <- get
     let opted = optimized st
     let unopt = ppl st \\ opted
-    let opt = map (optimizeConsts (cfg st)) unopt
+    let !opt = parMap rdeepseq (optimizeConsts (cfg st)) unopt
     put st { ppl = opted ++ opt, optimized = opted ++ opt }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
@@ -115,6 +117,7 @@ runOpt' vars dat cv a = fst $ fitModel 1E-4 1E-4 5 (gaModel (a, cvNames, vars), 
 
 gaModel :: (GAble a) => (a, [String], [String]) -> [Double] -> [Double] -> [Double]
 gaModel !(!a, !cNames, !vNames) !consts !vars = [realToFrac $ compute ((second realToFrac) <$> (zip cNames consts ++ zip vNames vars)) a]
+{-# SPECIALIZE gaModel :: (ExprTree Double, [String], [String]) -> [Double] -> [Double] -> [Double] #-}
 
 optimizeConsts :: (GAble a) => GAConfig a -> a -> a
 optimizeConsts cfg a = fixVars (zip (map fst cv) res) varred
@@ -125,7 +128,8 @@ assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
         st <- get
         let ppls = ppl st
-        put st { fits = zip ppls (map (getFit st) ppls) }
+        let !as = parMap rdeepseq (getFit st) ppls
+        put st { fits = zip ppls as }
     where getFit st a | Just x <- lookup a (fits st) = x
                       | otherwise = getChromoFit a st
 
@@ -219,7 +223,7 @@ instance GAble IncMatrix where
     randGAInst = randIncMatrix
     -}
 
-instance (SuitableConst a, Num a, Real a, Floating a, Formattable a, RealFloat a) => GAble (ExprTree a) where
+instance (SuitableConst a, Num a, Real a, NFData a, Floating a, Formattable a, RealFloat a) => GAble (ExprTree a) where
     type ComputeRes (ExprTree a) = a
     mutate = mutateTree
     crossover = coTrees
