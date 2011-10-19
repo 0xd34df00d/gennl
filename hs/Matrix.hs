@@ -4,7 +4,8 @@ module Matrix
         showMat,
         idMat,
         nullMat,
-        fromLists,
+        fromRows,
+        fromCols,
         trp,
         dims,
         rows,
@@ -63,9 +64,12 @@ idMat n = Matrix (array ((0, 0), (n - 1, n - 1)) [((i, j), f i j) | i <- [0..n-1
 nullMat :: Matrix e
 nullMat = Matrix (array ((0, 0), (-1, -1)) [])
 
-fromLists :: [[e]] -> Matrix e
-fromLists rows | null rows || null (head rows) = nullMat
-               | otherwise = Matrix (listArray ((0, 0), (length rows - 1, length (head rows) - 1)) (concat rows))
+fromRows :: [[e]] -> Matrix e
+fromRows rows | null rows || null (head rows) = nullMat
+              | otherwise = Matrix (listArray ((0, 0), (length rows - 1, length (head rows) - 1)) (concat rows))
+
+fromCols :: [[e]] -> Matrix e
+fromCols = fromRows . transpose
 
 trp :: Matrix e -> Matrix e
 trp m = Matrix $ ixmap ((0, 0), swp $ dims m) swp (Matrix.elems m)
@@ -110,10 +114,10 @@ cols :: Matrix e -> [[e]]
 cols = rows . trp
 
 rowsAsMats :: Matrix e -> [Matrix e]
-rowsAsMats = map (fromLists . listize) . rows
+rowsAsMats = map (fromRows . listize) . rows
 
 colsAsMats :: Matrix e -> [Matrix e]
-colsAsMats = map (fromLists . listize) . cols
+colsAsMats = map (fromRows . listize) . cols
 
 (@@-) :: Matrix e -> (Int, Int) -> e
 (@@-) m p = Matrix.elems m ! p
@@ -142,10 +146,7 @@ infixl 7 |*
 infixl 6 +|+
 
 (-|-) :: Num e => Matrix e -> Matrix e -> Matrix e
-(-|-) l r = Matrix (array ((0, 0), d) [((i, j), les ! (i, j) - res ! (i, j)) | i <- [0..rs], j <- [0..cs]])
-    where d@(rs, cs) = dims l
-          les = Matrix.elems l
-          res = Matrix.elems r
+(-|-) l r = l +|+ (r |* (-1))
 infixl 6 -|-
 
 (*|*) :: Num e => Matrix e -> Matrix e -> Matrix e
