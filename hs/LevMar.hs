@@ -17,7 +17,7 @@ type MModel a = (Matrix a, Matrix a) -> a
 type MJacob a = (Matrix a, Matrix a) -> Matrix a
 
 vecFun :: Num a => MModel a -> Matrix a -> Matrix a -> Matrix a
-vecFun f β xs = fromRows $ listize (map (\x -> f (β, x)) xs')
+vecFun f β xs = fromCols [map (\x -> f (β, x)) xs']
     where xs' = rowsAsMats xs
 
 jacMat :: Num a => MJacob a -> Matrix a -> Matrix a -> Matrix a
@@ -32,9 +32,9 @@ j2v j p = fromRows [j (join (***) (concat . cols) p)]
 
 fitModel :: (Num a, Fractional a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> [a]
 fitModel f j pts β = concat $ cols $ fitModel' 0 (f2v f) (j2v j) yv xv βv
-    where yv = fromRows $ map (\x -> [fst x]) pts
+    where yv = fromCols [map fst pts]
           xv = fromRows $ map snd pts
-          βv = fromRows $ listize β
+          βv = fromCols [β]
 
 fitModel' :: (Num a, Fractional a) => Int -> MModel a -> MJacob a -> Matrix a -> Matrix a -> Matrix a -> Matrix a
 fitModel' iter f j ys xs β | iter > 100 = β +|+ δ
