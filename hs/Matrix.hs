@@ -1,5 +1,6 @@
 module Matrix
     (
+        Matrix,
         showMat,
         idMat,
         nullMat,
@@ -8,15 +9,19 @@ module Matrix
         dims,
         rows,
         cols,
+        rowsAsMats,
+        colsAsMats,
         diagMat,
-        diagFrom,
+        diag,
         minorMat,
         det,
+        invMat,
         (@@-),
         (*|*),
         (*|),
         (|*),
         (+|+),
+        (-|-),
         (|+),
         (+|)
     )
@@ -26,6 +31,8 @@ import Data.Array
 import Data.List
 import Data.Functor
 import Debug.Trace
+
+import SupportUtils
 
 data Matrix e = Matrix {
         elems :: Array (Int, Int) e
@@ -42,10 +49,10 @@ dims :: Matrix e -> (Int, Int)
 dims = snd . bounds . Matrix.elems
 
 showMat :: Show e => Matrix e -> String
-showMat m = "Dims: " ++ show (r + 1, c + 1) ++ "\n" ++ (intercalate "\n" $ map printRow [0..r])
+showMat m = "Dims: " ++ show (r + 1, c + 1) ++ "\n" ++ intercalate "\n" (map printRow [0..r])
     where (r, c) = dims m
           es = Matrix.elems m
-          printRow r = intercalate " " $ map (\c -> printElem (r, c)) [0..c]
+          printRow r = unwords $ map (\c -> printElem (r, c)) [0..c]
           printElem p = show (es ! p)
 
 idMat :: Num e => Int -> Matrix e
@@ -67,8 +74,8 @@ trp m = Matrix $ ixmap ((0, 0), swp $ dims m) swp (Matrix.elems m)
 diagMat :: Num e => Int -> e -> Matrix e
 diagMat n e = idMat n |* e
 
-diagFrom :: Num e => Matrix e -> Matrix e
-diagFrom m = Matrix (array ((0, 0), ds) [((i, j), t i j) | i <- [0..fst ds], j <- [0..snd ds]])
+diag :: Num e => Matrix e -> Matrix e
+diag m = Matrix (array ((0, 0), ds) [((i, j), t i j) | i <- [0..fst ds], j <- [0..snd ds]])
     where ds = dims m
           t i j | i == j = m @@- (i, j)
                 | otherwise = 0
@@ -89,8 +96,8 @@ det m | dims m == (0, 0) = m @@- (0, 0)
                  | otherwise = negate $ step' i
           (rs, cs) = dims m
 
-inverseMat :: (Num e, Fractional e) => Matrix e -> Matrix e
-inverseMat m = trp m |* recip (det m)
+invMat :: (Num e, Fractional e) => Matrix e -> Matrix e
+invMat m = trp m |* recip (det m)
 
 rows :: Matrix e -> [[e]]
 rows m = map getRow [0..r]
@@ -102,8 +109,14 @@ rows m = map getRow [0..r]
 cols :: Matrix e -> [[e]]
 cols = rows . trp
 
+rowsAsMats :: Matrix e -> [Matrix e]
+rowsAsMats = map (fromLists . listize) . rows
+
+colsAsMats :: Matrix e -> [Matrix e]
+colsAsMats = map (fromLists . listize) . cols
+
 (@@-) :: Matrix e -> (Int, Int) -> e
-(@@-) m p = (Matrix.elems m) ! p
+(@@-) m p = Matrix.elems m ! p
 
 (+|) :: Num e => e -> Matrix e -> Matrix e
 (+|) n m = (+n) <$> m
@@ -127,6 +140,13 @@ infixl 7 |*
           les = Matrix.elems l
           res = Matrix.elems r
 infixl 6 +|+
+
+(-|-) :: Num e => Matrix e -> Matrix e -> Matrix e
+(-|-) l r = Matrix (array ((0, 0), d) [((i, j), les ! (i, j) - res ! (i, j)) | i <- [0..rs], j <- [0..cs]])
+    where d@(rs, cs) = dims l
+          les = Matrix.elems l
+          res = Matrix.elems r
+infixl 6 -|-
 
 (*|*) :: Num e => Matrix e -> Matrix e -> Matrix e
 (*|*) l r = Matrix (array ((0, 0), (nl - 1, nr - 1)) [((i, j), mulVecs (lrows !! i) (rcols !! j)) | i <- [0..nl - 1], j <- [0..nr - 1]])

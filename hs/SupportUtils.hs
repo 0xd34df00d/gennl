@@ -5,7 +5,8 @@ module SupportUtils
         TextableException,
         failStr,
         nRands,
-        rndGens
+        rndGens,
+        listize
     )
     where
 
@@ -36,3 +37,6 @@ nRands g n = (take n $ unfoldr (Just . random) g1, g2)
 
 rndGens :: (RandomGen g) => g -> [g]
 rndGens = unfoldr (Just . split)
+
+listize :: [a] -> [[a]]
+listize = map (:[])
