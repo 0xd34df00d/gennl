@@ -4,6 +4,7 @@ module LevMar
 import Control.Arrow
 import Control.Monad
 import Numeric.FAD
+import Debug.Trace
 
 import Matrix
 import SupportUtils
@@ -30,27 +31,38 @@ f2v f p = f (join (***) (concat . cols) p)
 j2v :: Jacob a -> MJacob a
 j2v j p = fromRows [j (join (***) (concat . cols) p)]
 
-fitModel :: (Num a, Fractional a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> [a]
-fitModel f j pts β = concat $ cols $ fitModel' 0 (f2v f) (j2v j) yv xv βv
+modelSSE :: (Floating a) => MModel a -> (Matrix a, Matrix a) -> Matrix a -> a
+modelSSE f (ys, xs) β = sqrt (absMVec (ys -|- vecFun f β xs))
+
+fitModel :: (Ord a, Floating a, Fractional a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> [a]
+fitModel f j pts β = concat $ cols $ fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, xv) βv
     where yv = fromCols [map fst pts]
           xv = fromRows $ map snd pts
           βv = fromCols [β]
+          sse = modelSSE (f2v f) (yv, xv) βv
 
-fitModel' :: (Num a, Fractional a) => Int -> MModel a -> MJacob a -> Matrix a -> Matrix a -> Matrix a -> Matrix a
-fitModel' iter f j ys xs β | iter > 100 = β +|+ δ
-                           | otherwise = fitModel' (iter + 1) f j ys xs (β +|+ δ)
-    where δ = invMat (js +|+ λ *| diag js) *|* jmt *|* (ys -|- vecFun f β xs)
+fitModel' :: (Ord a, Floating a, Fractional a) => Int -> a -> a -> MModel a -> MJacob a -> (Matrix a, Matrix a) -> Matrix a -> Matrix a
+fitModel' iter λ sse f j (ys, xs) β | iter > 30 || shStop = β
+                                    | otherwise = (sse, ssed, iter', λ', β') `traceShow` fitModel' iter' λ' sse' f j (ys, xs) β'
+    where δfor λ = invMat (js +|+ λ *| diag js) *|* jmt *|* (ys -|- vecFun f β xs)
           jm = jacMat j β xs
           jmt = trp jm
           js = jmt *|* jm
-          λ = 1
+          shStop | iter' > iter = absMVec (β' -|- β) < min 0.00001 (absMVec β / 100)
+                 | otherwise = abs (ssed - sse) / (max ssed sse) < 0.000000001
+          ν = 4
+          (λd, λu) = (λ / ν, λ * ν)
+          δd = δfor λd
+          ssed = modelSSE f (ys, xs) (β +|+ δd)
+          (iter', sse', λ', β') | ssed <= sse = (iter + 1, ssed, λd, β +|+ δd)
+                                | otherwise = (iter, sse, λu, β)
 
 f1 :: Num a => Model a
-f1 (a:b:[], x:y:[]) = a*x + b*y*y
+f1 (a:b:[], x:y:[]) = a * x + b * y * y
 
 j1 :: (Real a, Fractional a, Num a) => Jacob a
 j1 (cs@(a:b:[]), xs@(x:y:[])) = concat $ jacobian (\cts -> [f1 (map realToFrac cs, cts)]) xs
 
-xs = [[0.0, 0.0], [1.0, 1.0], [2.0, 1.0]]
+xs = [[x, y] | x <- [0.0, 1.0 .. 10.0], y <- [0.0, 1.0 .. 10.0]]
 ys = map (\x -> f1 ([4, 5], x)) xs
-pts = zipWith (,) ys xs
+pts = zip ys xs
