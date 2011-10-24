@@ -42,15 +42,15 @@ fitModel f j pts β = concat $ cols $ fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, 
           sse = modelSSE (f2v f) (yv, xv) βv
 
 fitModel' :: (Ord a, Floating a, Fractional a) => Int -> a -> a -> MModel a -> MJacob a -> (Matrix a, Matrix a) -> Matrix a -> Matrix a
-fitModel' iter λ sse f j (ys, xs) β | iter > 30 || shStop = β
+fitModel' iter λ sse f j (ys, xs) β | iter > 1000 || shStop = β
                                     | otherwise = (sse, ssed, iter', λ', β') `traceShow` fitModel' iter' λ' sse' f j (ys, xs) β'
     where δfor λ = invMat (js +|+ λ *| diag js) *|* jmt *|* (ys -|- vecFun f β xs)
           jm = jacMat j β xs
           jmt = trp jm
           js = jmt *|* jm
-          shStop | iter' > iter = absMVec (β' -|- β) < min 0.00001 (absMVec β / 100)
-                 | otherwise = abs (ssed - sse) / (max ssed sse) < 0.000000001
-          ν = 4
+          shStop | iter' > iter = absMVec (β' -|- β) < min 0.00001 (absMVec β / 50)
+                 | otherwise = λ > 1e16
+          ν = 5.5
           (λd, λu) = (λ / ν, λ * ν)
           δd = δfor λd
           ssed = modelSSE f (ys, xs) (β +|+ δd)
@@ -58,11 +58,11 @@ fitModel' iter λ sse f j (ys, xs) β | iter > 30 || shStop = β
                                 | otherwise = (iter, sse, λu, β)
 
 f1 :: Num a => Model a
-f1 (a:b:[], x:y:[]) = a * x + b * y * y
+f1 (a:b:[], x:y:[]) = a * x + b * y
 
 j1 :: (Real a, Fractional a, Num a) => Jacob a
-j1 (cs@(a:b:[]), xs@(x:y:[])) = concat $ jacobian (\cts -> [f1 (map realToFrac cs, cts)]) xs
+j1 (cs@(a:b:[]), xs@(x:y:[])) = concat $ jacobian (\cts -> [f1 (cts, map realToFrac xs)]) cs
 
-xs = [[x, y] | x <- [0.0, 1.0 .. 10.0], y <- [0.0, 1.0 .. 10.0]]
+xs = [[x, y] | x <- [5.0 .. 10.0], y <- [5.0 .. 10.0]]
 ys = map (\x -> f1 ([4, 5], x)) xs
 pts = zip ys xs
