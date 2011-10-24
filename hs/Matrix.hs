@@ -1,4 +1,7 @@
+{-# LANGUAGE BangPatterns #-}
+
 module Matrix
+{-
     (
         Matrix,
         showMat,
@@ -27,11 +30,16 @@ module Matrix
         (|+),
         (+|)
     )
+    -}
     where
 
+import Control.Monad
+import Control.Arrow
 import Data.Array
 import Data.List
 import Data.Functor
+import Data.Maybe
+import qualified Matrix.LU as LU
 import Debug.Trace
 
 import SupportUtils
@@ -86,14 +94,17 @@ diag m = Matrix (array ((0, 0), ds) [((i, j), t i j) | i <- [0..fst ds], j <- [0
                 | otherwise = 0
 
 minorMat :: Matrix e -> (Int, Int) -> Matrix e
-minorMat m (mr, mc) = Matrix (array ((0, 0), (dr - 1, dc - 1)) [((i, j), t i j) | i <- [0..dr - 1], j <- [0..dc - 1]])
-    where (dr, dc) = dims m
-          t i j = m @@- (fix i mr, fix j mc)
-          fix i p | i < p = i
-                  | otherwise = i + 1
+minorMat !m !(!mr, !mc) = Matrix (array ((0, 0), (dr - 1, dc - 1)) [((i, j), t i j) | i <- [0..dr - 1], j <- [0..dc - 1]])
+    where !(!dr, !dc) = dims m
+          t !i !j = m @@- (fix i mr, fix j mc)
+          fix !i !p | i < p = i
+                     | otherwise = i + 1
 
 absMVec :: (Floating e) => Matrix e -> e
 absMVec e = sqrt ((trp e *|* e) @@- (0, 0))
+
+trM :: Num e => Matrix e -> e
+trM m = foldl' (\s n -> s + m @@- (n, n)) 0 [0..fst $ dims m]
 
 det :: Num e => Matrix e -> e
 det m | dims m == (0, 0) = m @@- (0, 0)
@@ -103,9 +114,53 @@ det m | dims m == (0, 0) = m @@- (0, 0)
           step i | i `mod` 2 == 0 = step' i 
                  | otherwise = negate $ step' i
           (rs, cs) = dims m
+{-# SPECIALIZE det :: Matrix Double -> Double #-}
+
+minorsMat :: Num e => Matrix e -> Matrix e
+minorsMat m = Matrix (array ((0, 0), (r, c)) [((i, j), sgn i j * det (minorMat m (i, j))) | i <- [0..r], j <- [0..c]])
+    where (r, c) = dims m
+          sgn i j | (i + j) `mod` 2 == 0 = 1
+                  | otherwise = -1
 
 invMat :: (Num e, Fractional e) => Matrix e -> Matrix e
-invMat m = trp m |* recip (det m)
+invMat m = trp (minorsMat m) |* recip (det m)
+
+invMatLU :: (Real e, Fractional e) => Matrix e -> Matrix e
+invMatLU m = Matrix (realToFrac <$> invEs (realToFrac <$> Matrix.elems m))
+    where invEs arr = ixmap (bounds arr) (pT (+1)) $ LU.inverse $ ixmap ((1, 1), pT (+1) $ dims m) (pT (\x -> x-1)) arr
+          pT = join (***)
+
+subDiagMat :: (Int, Int) -> Matrix e -> Matrix e
+subDiagMat (s, e) m = Matrix (array ((0, 0), (e', e')) [((i - s, j - s), m @@- (i, j)) | i <- [s..e], j <- [s..e]])
+    where e' = e - s
+
+subMat :: (Int, Int) -> (Int, Int) -> Matrix e -> Matrix e
+subMat (sr, sc) (er, ec) m = Matrix (array ((0, 0), (er - sr, ec - sc)) [((i - sr, j - sc), m @@- (i, j)) | i <- [sr..er], j <- [sc..ec]])
+
+invMat2 :: (Fractional e) => Matrix e -> Matrix e
+invMat2 m | n == 0 = m
+          | n == 1 = recip (det m) *| fromRows [ [m @@- (1, 1), (-1) * (m @@- (0, 1))], [(-1) * (m @@- (1, 0)), m @@- (0, 0)] ]
+          | n == 2 = recip (det m) *| fromRows [ [a', d', g'], [b', e', h'], [c', f', k'] ]
+          | otherwise = fromRows (zipWith (++) (rows aM') (rows bM') ++ zipWith (++) (rows cM') (rows dM'))
+    where n = fst $ dims m
+          (a:b:c:d:e:f:g:h:k:[]) = [m @@- (i, j) | i <- [0..2], j <- [0..2]]
+          a' = e*k - f*h
+          b' = f*g - d*k
+          c' = d*h - e*g
+          d' = c*h - b*k
+          e' = a*k - c*g
+          f' = g*b - a*h
+          g' = b*f - c*e
+          h' = c*d - a*f
+          k' = a*e - b*d
+          aMi = invMat2 $ subDiagMat (0, 2) m
+          bM = subMat (0, 3) (2, n) m
+          cM = subMat (3, 0) (n, 2) m
+          dM = subDiagMat (3, n) m
+          dM' = invMat2 $ dM -|- (cM *|* aMi *|* bM)
+          aM' = aMi +|+ aMi *|* bM *|* dM' *|* cM *|* aMi
+          bM' = (-1) *| (aMi *|* bM *|* dM')
+          cM' = (-1) *| (dM' *|* cM *|* aMi)
 
 rows :: Matrix e -> [[e]]
 rows m = map getRow [0..r]
@@ -124,7 +179,7 @@ colsAsMats :: Matrix e -> [Matrix e]
 colsAsMats = map (fromRows . listize) . cols
 
 (@@-) :: Matrix e -> (Int, Int) -> e
-(@@-) m p = Matrix.elems m ! p
+(@@-) !m !p = Matrix.elems m ! p
 
 (+|) :: Num e => e -> Matrix e -> Matrix e
 (+|) n m = (+n) <$> m

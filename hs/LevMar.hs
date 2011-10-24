@@ -34,35 +34,36 @@ j2v j p = fromRows [j (join (***) (concat . cols) p)]
 modelSSE :: (Floating a) => MModel a -> (Matrix a, Matrix a) -> Matrix a -> a
 modelSSE f (ys, xs) β = sqrt (absMVec (ys -|- vecFun f β xs))
 
-fitModel :: (Ord a, Floating a, Fractional a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> [a]
+fitModel :: (Ord a, RealFloat a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> [a]
 fitModel f j pts β = concat $ cols $ fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, xv) βv
     where yv = fromCols [map fst pts]
           xv = fromRows $ map snd pts
           βv = fromCols [β]
           sse = modelSSE (f2v f) (yv, xv) βv
 
-fitModel' :: (Ord a, Floating a, Fractional a) => Int -> a -> a -> MModel a -> MJacob a -> (Matrix a, Matrix a) -> Matrix a -> Matrix a
-fitModel' iter λ sse f j (ys, xs) β | iter > 1000 || shStop = β
-                                    | otherwise = (sse, ssed, iter', λ', β') `traceShow` fitModel' iter' λ' sse' f j (ys, xs) β'
-    where δfor λ = invMat (js +|+ λ *| diag js) *|* jmt *|* (ys -|- vecFun f β xs)
+fitModel' :: (Ord a, RealFloat a) => Int -> a -> a -> MModel a -> MJacob a -> (Matrix a, Matrix a) -> Matrix a -> Matrix a
+fitModel' iter λ sse f j (ys, xs) β | iter > 20 || shStop = β
+                                    | otherwise = {-(sse, ssed, iter', λ', β') `traceShow`-} fitModel' iter' λ' sse' f j (ys, xs) β'
+    where δfor λ = invMatLU (js +|+ λ *| diag js) *|* jmt *|* (ys -|- vecFun f β xs)
           jm = jacMat j β xs
           jmt = trp jm
           js = jmt *|* jm
-          shStop | iter' > iter = absMVec (β' -|- β) < min 0.00001 (absMVec β / 50)
+          shStop | iter' > iter = absMVec (β' -|- β) < min 0.00001 (absMVec β / 50) || isInfinite sse
                  | otherwise = λ > 1e16
           ν = 5.5
-          (λd, λu) = (λ / ν, λ * ν)
+          (λd, λu) = (if λ < 1e-284 && λ >= 0 then -1e-284 else λ / ν, if λ > -1e-284 && λ <= 0 then 1e-284 else λ * ν)
           δd = δfor λd
           ssed = modelSSE f (ys, xs) (β +|+ δd)
           (iter', sse', λ', β') | ssed <= sse = (iter + 1, ssed, λd, β +|+ δd)
                                 | otherwise = (iter, sse, λu, β)
+--{-# SPECIALIZE fitModel' :: Int -> Double -> Double -> MModel Double -> MJacob Double -> (Matrix Double, Matrix Double) -> Matrix Double -> Matrix Double #-}
 
-f1 :: Num a => Model a
-f1 (a:b:[], x:y:[]) = a * x + b * y
+f1 :: Floating a => Model a
+f1 (a:b:c:[], x:y:[]) = a * x + b * y + c * y * sin x
 
-j1 :: (Real a, Fractional a, Num a) => Jacob a
-j1 (cs@(a:b:[]), xs@(x:y:[])) = concat $ jacobian (\cts -> [f1 (cts, map realToFrac xs)]) cs
+j1 :: (Real a, Fractional a, Floating a) => Jacob a
+j1 (cs@(a:b:c:[]), xs@(x:y:[])) = concat $ jacobian (\cts -> [f1 (cts, map realToFrac xs)]) cs
 
-xs = [[x, y] | x <- [5.0 .. 10.0], y <- [5.0 .. 10.0]]
-ys = map (\x -> f1 ([4, 5], x)) xs
+xs = [[x, y] | x <- [0.0 .. 5.0], y <- [0.0 .. 5.0]]
+ys = map (\x -> f1 ([4, 5, 2], x)) xs
 pts = zip ys xs

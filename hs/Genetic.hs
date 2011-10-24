@@ -16,13 +16,11 @@ import Data.List
 import Data.Maybe
 import Data.Functor ((<$>))
 import Numeric.FAD
-import Numeric.GSL.Fitting
 import Debug.Trace
 import Data.Ord (comparing)
 import Random
 
 import ExprTree
---import ExprIncidenceMatrix
 import SupportUtils
 import Formattable
 import qualified LevMar
@@ -54,7 +52,7 @@ class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (Comput
     randGAInst :: RandomGen g => [String] -> Int -> g -> (a, g)
     variateConsts :: a -> (a, [(String, ComputeRes a)])
     fixVars :: [(String, ComputeRes a)] -> a -> a
-    jacForConsts :: a -> ([String], [String]) -> [Double] -> [Double] -> [[Double]]
+    jacForConsts :: a -> ([String], [String]) -> [Double] -> [Double] -> [Double]
     complexity :: a -> Double
     complexity _ = 1.0
     res2double :: ComputeRes a -> Double
@@ -82,7 +80,7 @@ initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
-    where chain = --optimizePplConsts >>
+    where chain = optimizePplConsts >>
                   assessPpl >>
                   sortPpl >>
                   cleanBad >>
@@ -109,15 +107,16 @@ optimizePplConsts = do
     put st { ppl = opted ++ opt, optimized = opted ++ opt }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
-runOpt vars dat cv a = realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac <$> a, [realToFrac b])) <$> dat) (second realToFrac <$> cv) a
+runOpt vars dat cv a = realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
 
-runOpt' :: (GAble a) => [String] -> [([Double], [Double])] -> [(String, Double)] -> a -> [Double]
-runOpt' vars dat cv a = fst $ fitModel 1E-4 1E-4 5 (gaModel (a, cvNames, vars), jacForConsts a (cvNames, vars)) dat (map snd cv)
+runOpt' :: (GAble a) => [String] -> [(Double, [Double])] -> [(String, Double)] -> a -> [Double]
+runOpt' vars dat cv a = LevMar.fitModel (gaModel (a, cvNames, vars)) j dat (map snd cv)
     where cvNames = fst <$> cv
+          j (c, v) = jacForConsts a (cvNames, vars) c v
 
-gaModel :: (GAble a) => (a, [String], [String]) -> [Double] -> [Double] -> [Double]
-gaModel !(!a, !cNames, !vNames) !consts !vars = [realToFrac $ compute ((second realToFrac) <$> (zip cNames consts ++ zip vNames vars)) a]
-{-# SPECIALIZE gaModel :: (ExprTree Double, [String], [String]) -> [Double] -> [Double] -> [Double] #-}
+gaModel :: (GAble a) => (a, [String], [String]) -> ([Double], [Double]) -> Double
+gaModel !(!a, !cNames, !vNames) !(!consts, !vars) = realToFrac $ compute ((second realToFrac) <$> (zip cNames consts ++ zip vNames vars)) a
+--{-# SPECIALIZE gaModel :: (ExprTree Double, [String], [String]) -> [Double] -> [Double] -> [Double] #-}
 
 optimizeConsts :: (GAble a) => GAConfig a -> a -> a
 optimizeConsts cfg a = fixVars (zip (map fst cv) res) varred

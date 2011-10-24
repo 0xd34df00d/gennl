@@ -171,8 +171,8 @@ morphTreeConsts _ (LeafVar v) = LeafVar v
 morphTreeConsts c (NodeUnary f t) = NodeUnary f (morphTreeConsts c t)
 morphTreeConsts c (NodeBinary f l r) = NodeBinary f (morphTreeConsts c l) (morphTreeConsts c r)
 
-varredTreeJac :: (Real a, Floating a, Fractional a) => ExprTree a -> ([String], [String]) -> [Double] -> [Double] -> [[Double]]
-varredTreeJac !t !(!cNames, !vNames) !consts !vars = ((<$>) . (<$>)) realToFrac $ jacobian (\cts -> [evalTree (zip cNames cts ++ zip vNames (realToFrac <$> vars)) (morphTreeConsts realToFrac t)]) (realToFrac <$> consts)
+varredTreeJac :: (Real a, Floating a, Fractional a) => ExprTree a -> ([String], [String]) -> [Double] -> [Double] -> [Double]
+varredTreeJac !t !(!cNames, !vNames) !consts !vars = concat $ ((<$>) . (<$>)) realToFrac $ jacobian (\cts -> [evalTree (zip cNames cts ++ zip vNames (realToFrac <$> vars)) (morphTreeConsts realToFrac t)]) (realToFrac <$> consts)
 
 walkFail :: String -> Int -> Int -> a
 walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n
