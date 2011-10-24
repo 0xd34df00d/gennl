@@ -15,6 +15,7 @@ module Matrix
         diagMat,
         diag,
         minorMat,
+        absMVec,
         det,
         invMat,
         (@@-),
@@ -90,6 +91,9 @@ minorMat m (mr, mc) = Matrix (array ((0, 0), (dr - 1, dc - 1)) [((i, j), t i j) 
           t i j = m @@- (fix i mr, fix j mc)
           fix i p | i < p = i
                   | otherwise = i + 1
+
+absMVec :: (Floating e) => Matrix e -> e
+absMVec e = sqrt ((trp e *|* e) @@- (0, 0))
 
 det :: Num e => Matrix e -> e
 det m | dims m == (0, 0) = m @@- (0, 0)
