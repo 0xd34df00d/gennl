@@ -43,13 +43,13 @@ fitModel f j pts β = concat $ cols $ fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, 
 
 fitModel' :: (Ord a, RealFloat a) => Int -> a -> a -> MModel a -> MJacob a -> (Matrix a, Matrix a) -> Matrix a -> Matrix a
 fitModel' iter λ sse f j (ys, xs) β | iter > 20 || shStop = β
-                                    | otherwise = {-(sse, ssed, iter', λ', β') `traceShow`-} fitModel' iter' λ' sse' f j (ys, xs) β'
+                                    | otherwise = (sse, ssed, iter', λ', β') `traceShow` fitModel' iter' λ' sse' f j (ys, xs) β'
     where δfor λ = invMatLU (js +|+ λ *| diag js) *|* jmt *|* (ys -|- vecFun f β xs)
           jm = jacMat j β xs
           jmt = trp jm
           js = jmt *|* jm
-          shStop | iter' > iter = absMVec (β' -|- β) < min 0.00001 (absMVec β / 50) || isInfinite sse
-                 | otherwise = λ > 1e16
+          shStop | iter' > iter = absMVec (β' -|- β) < min 0.00001 (absMVec β / 50) || isInfinite sse || isInfinite ssed
+                 | otherwise = λ > 1e9 || isInfinite sse || isInfinite ssed
           ν = 5.5
           (λd, λu) = (if λ < 1e-284 && λ >= 0 then -1e-284 else λ / ν, if λ > -1e-284 && λ <= 0 then 1e-284 else λ * ν)
           δd = δfor λd

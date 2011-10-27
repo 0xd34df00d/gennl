@@ -10,6 +10,8 @@ module ExprTree
 import Control.Parallel
 import Control.Parallel.Strategies
 import Control.DeepSeq
+import Control.Monad
+import Control.Arrow
 import Data.Functor ((<$>))
 import Random
 import Control.Arrow
@@ -19,36 +21,11 @@ import GHC.Float
 import Debug.Trace
 
 import SupportUtils
+import Funcs
 import Formattable
 
 data Var = Var String
     deriving (Show, Eq)
-
-data UnaryFunc = Sin | Cos | Log
-    deriving (Show, Eq)
-
-instance Formattable UnaryFunc where
-    pretty Sin = "sin"
-    pretty Cos = "cos"
-    pretty Log = "log"
-
-unaryOps = [ (Sin, sin), (Cos, cos), (Log, log) ]
-
-unaryOpsOnly = map fst unaryOps
-
-data BinaryFunc = Plus | Minus | Mul | Div | Pow
-    deriving (Show, Eq)
-
-instance Formattable BinaryFunc where
-    pretty Plus = "+"
-    pretty Minus = "-"
-    pretty Mul = "*"
-    pretty Div = "/"
-    pretty Pow = "**"
-
-binaryOps = [ (Plus, (+)), (Minus, (-)), (Mul, (*)), (Div, (/)), (Pow, (**)) ]
-
-binaryOpsOnly = map fst binaryOps
 
 data ExprTree a = NodeUnary !UnaryFunc !(ExprTree a)
                 | NodeBinary !BinaryFunc !(ExprTree a) !(ExprTree a)
@@ -82,7 +59,7 @@ randExprTree :: (RandomGen g, SuitableConst a) => [String] -> Int -> g -> (ExprT
 randExprTree vars cpx g = randExprTree' vars g (0, cpx)
 
 randExprTree' :: (RandomGen g, SuitableConst a) => [String] -> g -> (Int, Int) -> (ExprTree a, g)
-randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.20 0.30 = (LeafConst (dice * 50), g5)
+randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.15 0.30 = (LeafConst (dice * 50), g5)
                                | dh /= 0 && thr dice 0.30 0.30 = (LeafVar $ Var $ randElem vars g2, g5)
                                | dice <= 0.98 = (NodeBinary
                                                     (randElem binaryOpsOnly g2)
@@ -178,7 +155,7 @@ walkFail :: String -> Int -> Int -> a
 walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n
 
 -- Better to place terminating optimizations at the top, obviously
-simplifyTree :: (Floating a, SuitableConst a) => ExprTree a -> ExprTree a
+simplifyTree :: (RealFloat a) => ExprTree a -> ExprTree a
 simplifyTree (NodeBinary Pow _ (LeafConst 0.0)) = LeafConst 1.0
 simplifyTree (NodeBinary Pow l@(LeafConst 1.0) _) = l
 simplifyTree (NodeBinary Mul l@(LeafConst 0.0) _) = l
@@ -190,9 +167,15 @@ simplifyTree (NodeBinary a (LeafConst x) (LeafConst y)) = LeafConst $ maybe fail
 simplifyTree (NodeBinary Pow a (LeafConst 1.0)) = simplifyTree a
 simplifyTree (NodeBinary Mul (LeafConst 1.0) a) = simplifyTree a
 simplifyTree (NodeBinary Mul a (LeafConst 1.0)) = simplifyTree a
-simplifyTree (NodeBinary f a b) = NodeBinary f (simplifyTree a) (simplifyTree b)
+simplifyTree (NodeBinary Div a b) | a == b = LeafConst 1.0
+simplifyTree (NodeBinary f a b) | isConstNaN a' || isConstNaN b' = LeafConst $ 0.0 / 0.0
+                                | a /= a' || b /= b' = simplifyTree n
+                                | otherwise = n
+    where (a', b') = join (***) simplifyTree (a, b)
+          n = NodeBinary f a' b'
+          isConstNaN (LeafConst c) = isNaN c
+          isConstNaN _ = False
 simplifyTree (NodeUnary f a) = NodeUnary f (simplifyTree a)
 simplifyTree t = t
 
-simplifyStab t = if t == t' then t else simplifyStab t'
-    where t' = simplifyTree t
+simplifyStab = simplifyTree

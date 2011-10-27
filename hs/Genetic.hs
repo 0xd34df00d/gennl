@@ -23,6 +23,7 @@ import Random
 import ExprTree
 import SupportUtils
 import Formattable
+import Funcs
 import qualified LevMar
 
 data GAConfig a = GAConfig {
@@ -59,6 +60,8 @@ class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (Comput
     res2double = realToFrac
     double2res :: Double -> ComputeRes a
     double2res = realToFrac
+    simplify :: a -> a
+    simplify = id
 
 defConfig :: (GAble a) => GAConfig a
 defConfig = GAConfig
@@ -66,7 +69,7 @@ defConfig = GAConfig
                 (map fst binaryOps)
                 []
                 []
-                7
+                4
                 200
                 (\_ its maxF -> its > 100 || maxF > 0.95)
 
@@ -87,11 +90,11 @@ iterateGA = execState chain
                   cleanupFits >>
                   tickGA >>
                   mutateSome >>
-                  assessPpl >>
-                  sortPpl >>
                   crossoverSome >>
                   assessPpl >>
-                  sortPpl
+                  sortPpl >>
+                  cleanBad >>
+                  cleanupFits
 
 type MGState g a = State (GAState g a) ()
 
@@ -107,7 +110,7 @@ optimizePplConsts = do
     put st { ppl = opted ++ opt, optimized = opted ++ opt }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
-runOpt vars dat cv a = realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
+runOpt vars dat cv a = ("OPTIMIZING", a) `traceShow` realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
 
 runOpt' :: (GAble a) => [String] -> [(Double, [Double])] -> [(String, Double)] -> a -> [Double]
 runOpt' vars dat cv a = LevMar.fitModel (gaModel (a, cvNames, vars)) j dat (map snd cv)
@@ -154,7 +157,9 @@ delConseq p (x:xs) = reverse $ snd (foldl' step (x, [x]) xs)
                            | otherwise = (x, x : r)
 
 sortPpl :: (RandomGen g, GAble a) => MGState g a
-sortPpl = get >>= (\st -> put $ st { ppl = map fst (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) } )
+sortPpl = do
+        st <- get
+        put $ st { ppl = map fst (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) }
 
 cleanupFits :: (RandomGen g, GAble a) => MGState g a
 cleanupFits = get >>=
@@ -164,7 +169,7 @@ mutateSome :: (RandomGen g, GAble a) => MGState g a
 mutateSome = do
         st <- get
         let ppls = ppl st
-        let toTake = length ppls `div` 5
+        let toTake = length ppls `div` 3
         let gs = rndGens $ randGen st
         let news = zipWith (mutate st) gs (take toTake ppls)
         put st { ppl = news ++ ppls, randGen = gs !! toTake }
@@ -175,7 +180,7 @@ crossoverSome = do
         unless (1 `elem` map snd (fits st)) $ do
             let ppls = ppl st
             let l = length ppls
-            let rest = lastN (min 7 (l `div` 10)) ppls
+            let rest = lastN (min 7 (l `div` 3)) ppls
             let gs = rndGens $ randGen st
             let pairs = ns [ (m1, m2) | m1 <- rest, m2 <- rest ]
             let news = ns $ withStrategy rseq $ zipWith (crossover st) gs pairs
@@ -232,9 +237,10 @@ instance (SuitableConst a, Num a, Real a, NFData a, Floating a, Formattable a, R
     variateConsts = varTreeConsts
     fixVars = fixTreeVars
     jacForConsts = varredTreeJac
+    simplify = simplifyStab
 
-mutateTree :: (RandomGen g, Random a, Num a) => GAState g (ExprTree a) -> g -> ExprTree a -> ExprTree a
-mutateTree st g t = mutateTree' st g1 t (fst $ randomR (0, numNodes t - 1) g2) 0
+mutateTree :: (RandomGen g, Random a, RealFloat a) => GAState g (ExprTree a) -> g -> ExprTree a -> ExprTree a
+mutateTree st g t = simplifyStab $ mutateTree' st g1 t (fst $ randomR (0, numNodes t - 1) g2) 0
     where (g1, g2) = split g
 
 mutateTree' :: (RandomGen g, Random a, Num a) => GAState g (ExprTree a) -> g -> ExprTree a -> Int -> Int -> ExprTree a
@@ -253,15 +259,15 @@ mutGene :: (Eq a, RandomGen g) => a -> [a] -> g -> a
 mutGene ex vars g = fi !! fst (randomR (0, length fi - 1) g)
     where fi = filter (/= ex) vars
 
-coTrees :: (RandomGen g) => GAState g (ExprTree a) -> g -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)
-coTrees st g (t1, t2) = (t1', t2')
+coTrees :: (RandomGen g, Show a, RealFloat a) => GAState g (ExprTree a) -> g -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)
+coTrees st g (t1, t2) = ("MUTATE", t1, t2, t1', t2') `traceShow` (t1', t2')
     where gs = rndGens g
           p1 = getP (gs !! 0) t1
           p2 = getP (gs !! 1) t2
           t1' = swap (t1, p1) (t2, p2)
           t2' = swap (t2, p2) (t1, p1)
           getP g t = fst $ randomR (0, numNodes t - 1) g
-          swap (t1, p1) (t2, p2) = repSubTree p1 (subTree p2 t2) t1
+          swap (t1, p1) (t2, p2) = simplifyStab $ repSubTree p1 (subTree p2 t2) t1
 
 -- Utility stuff
 randElem :: [a] -> Double -> a
