@@ -62,6 +62,8 @@ class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (Comput
     double2res = realToFrac
     simplify :: a -> a
     simplify = id
+    isSameStruct :: a -> a -> Bool
+    isSameStruct = (==)
 
 defConfig :: (GAble a) => GAConfig a
 defConfig = GAConfig
@@ -70,8 +72,8 @@ defConfig = GAConfig
                 []
                 []
                 4
-                200
-                (\_ its maxF -> its > 100 || maxF > 0.95)
+                20
+                (\_ its maxF -> its > 10 || (its > 0 && maxF > 0.95))
 
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
 initGA c g = GAState c g 0 [] [] []
@@ -107,10 +109,10 @@ optimizePplConsts = do
     let opted = optimized st
     let unopt = ppl st \\ opted
     let !opt = parMap rdeepseq (optimizeConsts (cfg st)) unopt
-    put st { ppl = opted ++ opt, optimized = opted ++ opt }
+    put st { ppl = opted ++ opt, optimized = opted ++ opt, fits = filter (\x -> fst x `elem` unopt) (fits st) }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
-runOpt vars dat cv a = ("OPTIMIZING", a) `traceShow` realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
+runOpt vars dat cv a = ("OPTIMIZING", pretty a) `traceShow` realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
 
 runOpt' :: (GAble a) => [String] -> [(Double, [Double])] -> [(String, Double)] -> a -> [Double]
 runOpt' vars dat cv a = LevMar.fitModel (gaModel (a, cvNames, vars)) j dat (map snd cv)
@@ -136,17 +138,18 @@ assessPpl = do
                       | otherwise = getChromoFit a st
 
 getChromoFit :: (RandomGen g, GAble a) => a -> GAState g a -> ComputeRes a
-getChromoFit a st = 1 / (sum xs + 1)
+getChromoFit a st = 1 / (sum xs + 1) * cpxPen
     where xs = map f (testSet c)
           f smp = sqrt ((snd smp - compute (zip (vars c) (fst smp)) a) ** 2)
           c = cfg st
+          cpxPen = realToFrac $ 0.95 + 0.05 / (1 + (exp 1) ** (complexity a - 20))
 
 cleanBad :: (GAble a, RandomGen g) => MGState g a
 cleanBad = do
         st <- get
         let ppls' = ppl st
         let fs = fits st
-        let ppls = delConseq (\a b -> lookup a fs == lookup b fs) $ filter (\a -> not $ isNaN $ fromMaybe (0/0) (lookup a fs)) ppls'
+        let ppls = delConseq (\a b -> lookup a fs == lookup b fs || isSameStruct a b) $ filter (\a -> not $ isNaN $ fromMaybe (0/0) (lookup a fs)) ppls'
         put st { ppl = drop (diff ppls st) ppls }
             where diff p st = length p - optNum (cfg st)
 
@@ -182,7 +185,7 @@ crossoverSome = do
             let l = length ppls
             let rest = lastN (min 7 (l `div` 3)) ppls
             let gs = rndGens $ randGen st
-            let pairs = ns [ (m1, m2) | m1 <- rest, m2 <- rest ]
+            let pairs = ns [ (m1, m2) | m1 <- rest, m2 <- takeWhile (/= m1) rest ]
             let news = ns $ withStrategy rseq $ zipWith (crossover st) gs pairs
             let nl = length news
             put st { ppl = ppls ++ concatMap (\(x, y) -> [x, y]) news, randGen = gs !! nl }
@@ -190,13 +193,16 @@ crossoverSome = do
                       lastN n xs = drop (length xs - n) xs
 
 runGA :: (RandomGen g, GAble a) => GAState g a -> (a, ComputeRes a, GAState g a)
-runGA = runGA' . iterateGA
-
-runGA' :: (RandomGen g, GAble a) => GAState g a -> (a, ComputeRes a, GAState g a)
-runGA' st = if stopF (cfg st) (ppl st) (iter st) maxFitness
+runGA st | stopF (cfg st') (ppl st') (iter st') maxFitness = (best, maxFitness, st')
+         | otherwise = runGA st'
+    where st' = iterateGA st
+          (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st'))
+{-
+runGA st = if stopF (cfg st) (ppl st) (iter st) maxFitness
             then (best, maxFitness, st)
-            else runGA' $ iterateGA st
+            else runGA $ iterateGA st
     where (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st))
+    -}
 
 {-
 instance GAble IncMatrix where
@@ -238,6 +244,7 @@ instance (SuitableConst a, Num a, Real a, NFData a, Floating a, Formattable a, R
     fixVars = fixTreeVars
     jacForConsts = varredTreeJac
     simplify = simplifyStab
+    isSameStruct = isSameTreeStruct
 
 mutateTree :: (RandomGen g, Random a, RealFloat a) => GAState g (ExprTree a) -> g -> ExprTree a -> ExprTree a
 mutateTree st g t = simplifyStab $ mutateTree' st g1 t (fst $ randomR (0, numNodes t - 1) g2) 0
@@ -260,7 +267,7 @@ mutGene ex vars g = fi !! fst (randomR (0, length fi - 1) g)
     where fi = filter (/= ex) vars
 
 coTrees :: (RandomGen g, Show a, RealFloat a) => GAState g (ExprTree a) -> g -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)
-coTrees st g (t1, t2) = ("MUTATE", t1, t2, t1', t2') `traceShow` (t1', t2')
+coTrees st g (t1, t2) = ("CV", pretty t1, pretty t2, "NEW:", pretty t1', pretty t2') `traceShow` (t1', t2')
     where gs = rndGens g
           p1 = getP (gs !! 0) t1
           p2 = getP (gs !! 1) t2

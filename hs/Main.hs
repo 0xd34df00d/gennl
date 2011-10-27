@@ -23,6 +23,7 @@ applyP f s = case s of
         Left e -> Left e
 applyP' f s = applyP f $ parseStr s
 
+parsed s = applyP' id s
 simplified s = applyP' simplifyStab s
 --incMatrix s = applyP' toIncMatrix s
 
@@ -38,9 +39,9 @@ genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j
 
 main' :: Int -> Double -> IO ()
 main' num pts = do
-    --let recs = parseCSV (genSynth (\x y -> (exp 1) ** ((x / y + y / x) / 10) + 1) pts pts ++ "\r\n")
-    file <- readFile "options.dat.txt"
-    let recs = parseCSV file
+    let recs = parseCSV (genSynth (\x y -> (exp 1) ** ((x / y + y / x) / 10) + 1) pts pts ++ "\r\n")
+    --file <- readFile "options.dat.txt"
+    --let recs = parseCSV file
     g <- newStdGen
     print $ runStuff recs num g
 

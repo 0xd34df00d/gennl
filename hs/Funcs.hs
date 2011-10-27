@@ -4,7 +4,8 @@ module Funcs
 import Formattable
 
 data BinFuncInfo = BinFuncInfo {
-        comm :: Bool
+        comm :: Bool,
+        assoc :: Bool
     }
     deriving (Show, Eq)
 
@@ -38,9 +39,9 @@ binaryOpsOnly = map fst binaryOps
 
 binFuncInfos :: [(BinaryFunc, BinFuncInfo)]
 binFuncInfos = [
-                    (Plus, BinFuncInfo True),
-                    (Minus, BinFuncInfo False),
-                    (Mul, BinFuncInfo True),
-                    (Div, BinFuncInfo False),
-                    (Pow, BinFuncInfo False)
+                    (Plus, BinFuncInfo True True),
+                    (Minus, BinFuncInfo False False),
+                    (Mul, BinFuncInfo True True),
+                    (Div, BinFuncInfo False False),
+                    (Pow, BinFuncInfo False False)
                ]
