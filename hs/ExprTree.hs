@@ -154,6 +154,13 @@ varredTreeJac !t !(!cNames, !vNames) !consts !vars = concat $ ((<$>) . (<$>)) re
 walkFail :: String -> Int -> Int -> a
 walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n
 
+isSameTreeStruct :: ExprTree a -> ExprTree a -> Bool
+isSameTreeStruct (LeafConst _) (LeafConst _) = True
+isSameTreeStruct (LeafVar v1) (LeafVar v2) = v1 == v2
+isSameTreeStruct (NodeUnary f1 t1) (NodeUnary f2 t2) = f1 == f2 && isSameTreeStruct t1 t2
+isSameTreeStruct (NodeBinary f1 l1 r1) (NodeBinary f2 l2 r2) = f1 == f2 && isSameTreeStruct l1 l2 && isSameTreeStruct r1 r2
+isSameTreeStruct _ _ = False
+
 -- Better to place terminating optimizations at the top, obviously
 simplifyTree :: (RealFloat a) => ExprTree a -> ExprTree a
 simplifyTree (NodeBinary Pow _ (LeafConst 0.0)) = LeafConst 1.0
