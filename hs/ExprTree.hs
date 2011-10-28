@@ -17,7 +17,6 @@ import Random
 import Control.Arrow
 import Data.List
 import Numeric.FAD
-import GHC.Float
 import Debug.Trace
 
 import SupportUtils
