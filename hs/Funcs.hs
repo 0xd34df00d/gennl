@@ -1,6 +1,8 @@
 module Funcs
     where
 
+import Data.List
+
 import Formattable
 
 data BinFuncInfo = BinFuncInfo {
@@ -10,7 +12,7 @@ data BinFuncInfo = BinFuncInfo {
     deriving (Show, Eq)
 
 data UnaryFunc = Sin | Cos | Log
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 instance Formattable UnaryFunc where
     pretty Sin = "sin"
@@ -23,7 +25,7 @@ unaryOps = [ (Sin, sin), (Cos, cos), (Log, log) ]
 unaryOpsOnly = map fst unaryOps
 
 data BinaryFunc = Plus | Minus | Mul | Div | Pow
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 instance Formattable BinaryFunc where
     pretty Plus = "+"

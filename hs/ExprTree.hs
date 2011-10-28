@@ -14,7 +14,6 @@ import Control.Monad
 import Control.Arrow
 import Data.Functor ((<$>))
 import Random
-import Control.Arrow
 import Data.List
 import Numeric.FAD
 import Debug.Trace
@@ -24,13 +23,13 @@ import Funcs
 import Formattable
 
 data Var = Var String
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 data ExprTree a = NodeUnary !UnaryFunc !(ExprTree a)
                 | NodeBinary !BinaryFunc !(ExprTree a) !(ExprTree a)
                 | LeafVar !Var
                 | LeafConst !a
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 instance NFData a => NFData (ExprTree a)
 
