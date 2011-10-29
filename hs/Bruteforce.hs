@@ -61,4 +61,4 @@ stepBf st@(BfState c i ppl iters gens) = st { iter = i', ppl = ppl `S.union` ps 
           i' = i + 1
 
 runBf :: (Composable a, Ord a) => BfState a -> [BfState a]
-runBf = undefined
+runBf = iterate stepBf
