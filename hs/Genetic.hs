@@ -11,7 +11,6 @@ import Control.Monad.State
 import Control.Arrow
 import Control.Parallel.Strategies
 import Control.DeepSeq
-import Data.Packed.Matrix
 import Data.List
 import Data.Maybe
 import Data.Functor ((<$>))
@@ -72,8 +71,8 @@ defConfig = GAConfig
                 []
                 []
                 4
-                20
-                (\_ its maxF -> its > 10 || (its > 0 && maxF > 0.95))
+                50
+                (\_ its maxF -> its > 50 || (its > 0 && maxF > 0.95))
 
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
 initGA c g = GAState c g 0 [] [] []
@@ -86,17 +85,15 @@ initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
     where chain = optimizePplConsts >>
-                  assessPpl >>
-                  sortPpl >>
-                  cleanBad >>
-                  cleanupFits >>
-                  tickGA >>
-                  mutateSome >>
-                  crossoverSome >>
-                  assessPpl >>
-                  sortPpl >>
-                  cleanBad >>
-                  cleanupFits
+                    reassess >>
+                    tickGA >>
+                    mutateSome >>
+                    crossoverSome >>
+                    reassess
+          reassess = assessPpl >>
+                    clean nanF >>
+                    sortPpl >>
+                    clean sameF
 
 type MGState g a = State (GAState g a) ()
 
@@ -108,11 +105,11 @@ optimizePplConsts = do
     st <- get
     let opted = optimized st
     let unopt = ppl st \\ opted
-    let !opt = parMap rdeepseq (optimizeConsts (cfg st)) unopt
-    put st { ppl = opted ++ opt, optimized = opted ++ opt, fits = filter (\x -> fst x `elem` unopt) (fits st) }
+    let !opt = parListChunk (length unopt `div` 16) rdeepseq `withStrategy` map (optimizeConsts (cfg st)) unopt
+    put st { ppl = opted ++ opt, optimized = opted ++ opt, fits = [] } --filter (\x -> fst x `elem` opted) (fits st) }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
-runOpt vars dat cv a = ("OPTIMIZING", pretty a) `traceShow` realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
+runOpt vars dat cv a = {-("OPTIMIZING", pretty a) `traceShow`-} realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
 
 runOpt' :: (GAble a) => [String] -> [(Double, [Double])] -> [(String, Double)] -> a -> [Double]
 runOpt' vars dat cv a = LevMar.fitModel (gaModel (a, cvNames, vars)) j dat (map snd cv)
@@ -132,7 +129,7 @@ assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
         st <- get
         let ppls = ppl st
-        let !as = parMap rdeepseq (getFit st) ppls
+        let !as = parListChunk (length ppls `div` 16) rdeepseq `withStrategy` map (getFit st) ppls
         put st { fits = zip ppls as }
     where getFit st a | Just x <- lookup a (fits st) = x
                       | otherwise = getChromoFit a st
@@ -142,16 +139,23 @@ getChromoFit a st = 1 / (sum xs + 1) * cpxPen
     where xs = map f (testSet c)
           f smp = sqrt ((snd smp - compute (zip (vars c) (fst smp)) a) ** 2)
           c = cfg st
-          cpxPen = realToFrac $ 0.95 + 0.05 / (1 + (exp 1) ** (complexity a - 20))
+          cpxPen = realToFrac $ 0.95 + 0.05 / (1 + (exp 1) ** (complexity a - 10))
 
-cleanBad :: (GAble a, RandomGen g) => MGState g a
-cleanBad = do
+clean :: (GAble a, RandomGen g) => (GAState g a -> [a] -> [a]) -> MGState g a
+clean cleaner = do
         st <- get
-        let ppls' = ppl st
-        let fs = fits st
-        let ppls = delConseq (\a b -> lookup a fs == lookup b fs || isSameStruct a b) $ filter (\a -> not $ isNaN $ fromMaybe (0/0) (lookup a fs)) ppls'
-        put st { ppl = drop (diff ppls st) ppls }
+        let ppls' = cleaner st (ppl st)
+        let ppls = drop (diff ppls' st) ppls'
+        let rem = ppls \\ ppl st
+        put st { ppl = ppls, fits = filter (not . (`elem` rem) . fst) (fits st) }
             where diff p st = length p - optNum (cfg st)
+
+nanF :: (RandomGen g, GAble a) => GAState g a -> [a] -> [a]
+nanF st = filter (\a -> not $ isNaN $ fromMaybe (0/0) (lookup a (fits st)))
+
+sameF :: (RandomGen g, GAble a) => GAState g a -> [a] -> [a]
+sameF st = delConseq (\a b -> lookup a fs == lookup b fs || isSameStruct a b)
+    where fs = fits st
 
 delConseq :: (a -> a -> Bool) -> [a] -> [a]
 delConseq _ [] = []
@@ -162,11 +166,8 @@ delConseq p (x:xs) = reverse $ snd (foldl' step (x, [x]) xs)
 sortPpl :: (RandomGen g, GAble a) => MGState g a
 sortPpl = do
         st <- get
-        put $ st { ppl = map fst (filter (isNaN . snd) (fits st) ++ sortBy (comparing snd) (filter (not . isNaN . snd) (fits st))) }
-
-cleanupFits :: (RandomGen g, GAble a) => MGState g a
-cleanupFits = get >>=
-    (\st -> when (length (ppl st) /= length (fits st)) $ put $ st { fits = filter ((`elem` ppl st) . fst) (fits st) } )
+        put $ st { ppl = sortBy (cmp $ fits st) (ppl st), fits = sortBy (comparing snd) (fits st) }
+            where cmp fs = comparing (\x -> fromMaybe (0/0) (lookup x fs))
 
 mutateSome :: (RandomGen g, GAble a) => MGState g a
 mutateSome = do
@@ -267,7 +268,7 @@ mutGene ex vars g = fi !! fst (randomR (0, length fi - 1) g)
     where fi = filter (/= ex) vars
 
 coTrees :: (RandomGen g, Show a, RealFloat a) => GAState g (ExprTree a) -> g -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)
-coTrees st g (t1, t2) = ("CV", pretty t1, pretty t2, "NEW:", pretty t1', pretty t2') `traceShow` (t1', t2')
+coTrees st g (t1, t2) = {-("CV", pretty t1, pretty t2, "NEW:", pretty t1', pretty t2') `traceShow` -}(t1', t2')
     where gs = rndGens g
           p1 = getP (gs !! 0) t1
           p2 = getP (gs !! 1) t2
