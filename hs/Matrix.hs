@@ -163,14 +163,13 @@ invMat2 m | n == 0 = m
           cM' = (-1) *| (dM' *|* cM *|* aMi)
 
 rows :: Matrix e -> [[e]]
-rows m = map getRow [0..r]
-    where (r, c) = dims m
-          getRow i = map snd $ filter (\((r, _), _) -> r == i) as
-          es = Matrix.elems m
-          as = assocs es
+rows m = unfoldr (f . splitAt r) (Data.Array.elems $ Matrix.elems m)
+    where r = (snd $ dims m) + 1
+          f ([], _) = Nothing
+          f l = Just l
 
 cols :: Matrix e -> [[e]]
-cols = rows . trp
+cols = transpose . rows
 
 rowsAsMats :: Matrix e -> [Matrix e]
 rowsAsMats = map (fromRows . listize) . rows
