@@ -84,11 +84,11 @@ numNodes (NBin _ l r) = 1 + numNodes l + numNodes r
 evalTree :: Floating a => [(String, a)] -> ExprTree a -> a
 evalTree _ !(LC !c) = c
 evalTree !vars !(LVar !(Var !v)) | Just !c <- lookup v vars = c
-                                    | otherwise = error $ "Unknown var " ++ v
+                                 | otherwise = error $ "Unknown var " ++ v
 evalTree !vars !(NUn !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTree vars t
-                                  | otherwise = error $ "Unknown uf " ++ show f
+                            | otherwise = error $ "Unknown uf " ++ show f
 evalTree !vars !(NBin !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
-                                      | otherwise = error $ "Unknown bf " ++ show f
+                                | otherwise = error $ "Unknown bf " ++ show f
 
 atNodeBin :: (Int -> Int -> ExprTree a -> ExprTree a) -> Int -> Int -> (ExprTree a, ExprTree a) -> ExprTree a
 atNodeBin f i n (l, r) | nl +i >= n = f (i + 1) n l
@@ -146,8 +146,10 @@ morphTreeConsts _ (LVar v) = LVar v
 morphTreeConsts c (NUn f t) = NUn f (morphTreeConsts c t)
 morphTreeConsts c (NBin f l r) = NBin f (morphTreeConsts c l) (morphTreeConsts c r)
 
-varredTreeJac :: (Real a, Floating a, Fractional a) => ExprTree a -> ([String], [String]) -> [Double] -> [Double] -> [Double]
-varredTreeJac !t !(!cNames, !vNames) !consts !vars = concat $ ((<$>) . (<$>)) realToFrac $ jacobian (\cts -> [evalTree (zip cNames cts ++ zip vNames (realToFrac <$> vars)) (morphTreeConsts realToFrac t)]) (realToFrac <$> consts)
+varredTreeJac :: (RealFloat a) => ExprTree a -> ([String], [String]) -> [Double] -> [Double] -> [Double]
+varredTreeJac t (cNames, vNames) consts vars = realToFrac <$> map (evalTree vals) parts
+    where vals = zip (cNames ++ vNames) (map realToFrac $ consts ++ vars)
+          parts = map (\v -> partDiff (Var v) t) cNames
 
 walkFail :: String -> Int -> Int -> a
 walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n
@@ -168,7 +170,7 @@ ufDiff Asin t = NBin Div (LC 1) (NBin Pow (NBin Minus (LC 1) (NBin Pow t (LC 2))
 ufDiff Acos t = NBin Div (LC (-1)) (NBin Pow (NBin Minus (LC 1) (NBin Pow t (LC 2))) (LC 0.5))
 ufDiff Atan t = NBin Div (LC 1) (NBin Plus (LC 1) (NBin Pow t (LC 2)))
 
-bfDiff :: RealFloat a => BinaryFunc -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)-> ExprTree a
+bfDiff :: (Floating a, Real a) => BinaryFunc -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)-> ExprTree a
 bfDiff Plus _ (dl, dr) = NBin Plus dl dr
 bfDiff Minus _ (dl, dr) = NBin Minus dl dr
 bfDiff Mul (l, r) (dl, dr) = NBin Plus (NBin Mul l dr) (NBin Mul dl r)
@@ -180,12 +182,12 @@ bfDiff Pow (f, g) (df, dg) = NBin Mul lt rt
 -- ^^^ here we used that (f^g)' = (e^(g ln f))' = (g ln f)' e^(g ln f)
 -- (g ln f)' is named lt, the rest is rt
 
-partDiff :: RealFloat a => Var -> ExprTree a -> ExprTree a
+partDiff :: (RealFloat a) => Var -> ExprTree a -> ExprTree a
 partDiff _ (LC _) = LC 0
 partDiff v (LVar lv) | lv == v = LC 1
-                        | otherwise = LC 0
-partDiff v (NUn f t) = simplifyStab $ NBin Mul (ufDiff f t) (partDiff v t)
-partDiff v (NBin f l r) = simplifyStab $ bfDiff f (l, r) (partDiff v l, partDiff v r)
+                     | otherwise = LC 0
+partDiff v (NUn f t) = NBin Mul (ufDiff f t) (partDiff v t)
+partDiff v (NBin f l r) = bfDiff f (l, r) (partDiff v l, partDiff v r)
 
 -- Better to place terminating optimizations at the top, obviously
 simplifyTree :: (RealFloat a) => ExprTree a -> ExprTree a
@@ -208,8 +210,8 @@ simplifyTree (NBin f (LC a) (LC b)) | Just !f' <- lookup f binaryOps = LC $ f' a
                                                         | otherwise = error $ "Unknown bf " ++ show f
 simplifyTree (NBin Div a b) | a == b = LC 1.0
 simplifyTree (NBin f a b) | isConstNaN a' || isConstNaN b' = LC $ 0.0 / 0.0
-                                | a /= a' || b /= b' = simplifyTree n
-                                | otherwise = n
+                          | a /= a' || b /= b' = simplifyTree n
+                          | otherwise = n
     where (a', b') = join (***) simplifyTree (a, b)
           n = NBin f a' b'
           isConstNaN (LC c) = isNaN c
