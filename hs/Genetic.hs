@@ -198,41 +198,6 @@ runGA st | stopF (cfg st') (ppl st') (iter st') maxFitness = (best, maxFitness, 
          | otherwise = runGA st'
     where st' = iterateGA st
           (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st'))
-{-
-runGA st = if stopF (cfg st) (ppl st) (iter st) maxFitness
-            then (best, maxFitness, st)
-            else runGA $ iterateGA st
-    where (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st))
-    -}
-
-{-
-instance GAble IncMatrix where
-    mutate st g m = m'
-        where (t1:t2:t3:_, gen) = nRands g 3
-              opIdx = floor $ fromIntegral (rows (numMat m) + 1) * t1
-              newOp = case ops m !! opIdx of
-                    LeafCNode _ -> leafMutate (t2, t3) (cfg st)
-                    LeafTNode _ -> leafMutate (t2, t3) (cfg st)
-                    UnNode f -> unaryMutate t2 (cfg st)
-                    BinNode f -> binaryMutate t2 (cfg st)
-              m' = m { ops = replaceElem (ops m) opIdx newOp }
-              leafMutate (t1, t2) c | t1 >= 0.5 = LeafCNode $ t2 * 100
-                                    | otherwise = LeafTNode $ randElem (vars c) t2
-              unaryMutate t1 c = UnNode $ randElem (unaryOpsPool c) t1
-              binaryMutate t1 c = BinNode $ randElem (binaryOpsPool c) t1
-    crossover st g (m1, m2) = (m1', m2')
-        where gs = rndGens g
-              getP m g = fst $ randomR (1, cols (numMat m) - 1) g
-              p1 = getP m1 (head gs)
-              p2 = getP m2 (gs !! 1)
-              m1' = swap'' (m1, p1) (m2, p2)
-              m2' = swap'' (m2, p2) (m1, p1)
-              swap'' (m1, p1) (m2, p2) = replaceSubMat p1 (subTreeMat p2 m2) m1
-                    where m1s = cols $ numMat m1
-                          m2s = cols $ numMat m2
-    compute = evalMatrix
-    randGAInst = randIncMatrix
-    -}
 
 instance (SuitableConst a, Num a, Real a, NFData a, Floating a, Formattable a, RealFloat a) => GAble (ExprTree a) where
     type ComputeRes (ExprTree a) = a
