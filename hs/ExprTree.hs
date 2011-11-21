@@ -172,6 +172,10 @@ simplifyTree (NodeBinary a (LeafConst x) (LeafConst y)) = LeafConst $ maybe fail
 simplifyTree (NodeBinary Pow a (LeafConst 1.0)) = simplifyTree a
 simplifyTree (NodeBinary Mul (LeafConst 1.0) a) = simplifyTree a
 simplifyTree (NodeBinary Mul a (LeafConst 1.0)) = simplifyTree a
+simplifyTree (NodeBinary Minus a b) | a == b = LeafConst 0.0
+simplifyTree (NodeBinary Minus a (LeafConst b)) | b < 0 = NodeBinary Plus a (LeafConst (-b))
+simplifyTree (NodeBinary f (LeafConst a) (LeafConst b)) | Just !f' <- lookup f binaryOps = LeafConst $ f' a b
+                                                        | otherwise = error $ "Unknown bf " ++ show f
 simplifyTree (NodeBinary Div a b) | a == b = LeafConst 1.0
 simplifyTree (NodeBinary f a b) | isConstNaN a' || isConstNaN b' = LeafConst $ 0.0 / 0.0
                                 | a /= a' || b /= b' = simplifyTree n
