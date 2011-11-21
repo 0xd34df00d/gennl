@@ -129,6 +129,29 @@
 
 \section{Постановка задачи}
 
+Если множество значений $\mathbb{Y}_i$ функции $f_i$ содержится во множестве
+определения $\mathbb{X}_{i+1}$ функции $f_{i+1}$, то есть
+\[
+f_i : \mathbb{X}_i \to \mathbb{Y}_i \subset \mathbb{X}_{i+1}, i = 1, 2, \dots, \theta - 1,
+\]
+то функция
+\[
+f_\theta \circ f_{\theta-1} \circ \dots \circ f_1, \theta \geq 2,
+\]
+определяемая равенством
+\[
+(f_\theta \circ f_{\theta-1} \circ \dots \circ f_1) (\mathbf{x}) =
+  f_{\theta} (f_{\theta-1} (\dots (f_1 (\mathbf{x})))), x \in \mathbb{X}_1,
+\]
+называется \emph{сложной функцией}\cite{MathEnc1984_4} или
+\emph{суперпозицией функций} $f_1, f_2, \dots, f_\theta$.
+
+Таким образом, получаем
+\begin{defin}
+  Суперпозиция функций --- функция, представленная как композиция нескольких
+  функций. 
+\end{defin}
+
 Пусть дана регрессионная выборка:
 \[
 D = \{ (\mathbf{x}_i, y_i) \mid i \in \{1, \dots, N\},
