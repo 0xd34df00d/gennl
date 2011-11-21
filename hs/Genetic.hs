@@ -112,16 +112,16 @@ runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String,
 runOpt vars dat cv a = {-("OPTIMIZING", pretty a) `traceShow`-} realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
 
 runOpt' :: (GAble a) => [String] -> [(Double, [Double])] -> [(String, Double)] -> a -> [Double]
-runOpt' vars dat cv a = LevMar.fitModel (gaModel (a, cvNames, vars)) j dat (map snd cv)
+runOpt' vars dat cv a = LevMar.fitModel (gaModel (a, cvNames ++ vars)) j dat (map snd cv)
     where cvNames = fst <$> cv
           j (c, v) = jacForConsts a (cvNames, vars) c v
 
-gaModel :: (GAble a) => (a, [String], [String]) -> ([Double], [Double]) -> Double
-gaModel !(!a, !cNames, !vNames) !(!consts, !vars) = realToFrac $ compute ((second realToFrac) <$> (zip cNames consts ++ zip vNames vars)) a
---{-# SPECIALIZE gaModel :: (ExprTree Double, [String], [String]) -> [Double] -> [Double] -> [Double] #-}
+gaModel :: (GAble a) => (a, [String]) -> ([Double], [Double]) -> Double
+gaModel !(!a, !names) !(!consts, !vars) = realToFrac $ compute ((second realToFrac) <$> (zip names (consts ++ vars))) a
+--{-# SPECIALIZE gaModel :: (ExprTree Double, [String]) -> ([Double], [Double]) -> Double #-}
 
 optimizeConsts :: (GAble a) => GAConfig a -> a -> a
-optimizeConsts cfg a = fixVars (zip (map fst cv) res) varred
+optimizeConsts cfg a = simplify $ fixVars (zip (map fst cv) res) varred
     where (varred, cv) = variateConsts a
           res = runOpt (vars cfg) (testSet cfg) cv varred
 
@@ -146,15 +146,15 @@ clean cleaner = do
         st <- get
         let ppls' = cleaner st (ppl st)
         let ppls = drop (diff ppls' st) ppls'
-        let rem = ppls \\ ppl st
+        let rem = ppl st \\ ppls
         put st { ppl = ppls, fits = filter (not . (`elem` rem) . fst) (fits st) }
             where diff p st = length p - optNum (cfg st)
 
 nanF :: (RandomGen g, GAble a) => GAState g a -> [a] -> [a]
-nanF st = filter (\a -> not $ isNaN $ fromMaybe (0/0) (lookup a (fits st)))
+nanF st = {-("FITS", map snd $ fits st) `traceShow`-} filter (\a -> not $ isNaN $ fromMaybe (0/0) (liftM snd $ find (isSameStruct a . fst) (fits st)))
 
 sameF :: (RandomGen g, GAble a) => GAState g a -> [a] -> [a]
-sameF st = delConseq (\a b -> lookup a fs == lookup b fs || isSameStruct a b)
+sameF st = reverse . delConseq (\a b -> lookup a fs == lookup b fs || isSameStruct a b) . reverse
     where fs = fits st
 
 delConseq :: (a -> a -> Bool) -> [a] -> [a]
