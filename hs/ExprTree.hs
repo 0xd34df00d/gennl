@@ -25,10 +25,10 @@ import Formattable
 data Var = Var String
     deriving (Show, Eq, Ord)
 
-data ExprTree a = NodeUnary !UnaryFunc !(ExprTree a)
-                | NodeBinary !BinaryFunc !(ExprTree a) !(ExprTree a)
-                | LeafVar !Var
-                | LeafConst !a
+data ExprTree a = NUn !UnaryFunc !(ExprTree a)
+                | NBin !BinaryFunc !(ExprTree a) !(ExprTree a)
+                | LVar !Var
+                | LC !a
     deriving (Show, Eq, Ord)
 
 instance NFData a => NFData (ExprTree a)
@@ -37,34 +37,34 @@ class (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
 instance (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
 
 instance (Show a) => Formattable (ExprTree a) where
-    pretty (LeafVar (Var x)) = x
-    pretty (LeafConst c) = show c
-    pretty (NodeUnary f t) = pretty f ++ " (" ++ pretty t ++ ")"
-    pretty (NodeBinary f l r) = "(" ++ pretty l ++ pretty f ++ pretty r ++ ")"
+    pretty (LVar (Var x)) = x
+    pretty (LC c) = show c
+    pretty (NUn f t) = pretty f ++ " (" ++ pretty t ++ ")"
+    pretty (NBin f l r) = "(" ++ pretty l ++ pretty f ++ pretty r ++ ")"
 
-intLeaf = LeafConst . fromInteger
-realLeaf = LeafConst
+intLeaf = LC . fromInteger
+realLeaf = LC
 
-varLeaf = LeafVar . Var
+varLeaf = LVar . Var
 
-unaryNode s = NodeUnary <$> lookup s al 
+unaryNode s = NUn <$> lookup s al 
     where al = [ ("sin", Sin), ("cos", Cos), ("log", Log), ("tan", Tan), ("atan", Atan), ("asin", Asin), ("acos", Acos) ]
 
-binaryNode s = NodeBinary <$> lookup s al
+binaryNode s = NBin <$> lookup s al
     where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
 
 randExprTree :: (RandomGen g, SuitableConst a) => [String] -> Int -> g -> (ExprTree a, g)
 randExprTree vars cpx g = randExprTree' vars g (0, cpx)
 
 randExprTree' :: (RandomGen g, SuitableConst a) => [String] -> g -> (Int, Int) -> (ExprTree a, g)
-randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.01 0.30 = "CONST" `traceShow` (LeafConst (dice * 50), g5)
-                               | dh /= 0 && thr dice 0.30 0.30 = (LeafVar $ Var $ randElem vars g2, g5)
-                               | dice <= 0.85 = (NodeBinary
+randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.01 0.30 = "CONST" `traceShow` (LC (dice * 50), g5)
+                               | dh /= 0 && thr dice 0.30 0.30 = (LVar $ Var $ randElem vars g2, g5)
+                               | dice <= 0.85 = (NBin
                                                     (randElem binaryOpsOnly g2)
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx))
                                                     (fst $ randExprTree' vars g4 (dh + 1, cpx)),
                                                  g5)
-                               | otherwise = (NodeUnary
+                               | otherwise = (NUn
                                                     (randElem unaryOpsOnly g2)
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx)),
                                                  g5)
@@ -76,18 +76,18 @@ randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.01 0.30 = "CONST" `traceS
           thr dice t m = dice <= ((dh < cpx) ? t $ t / m)
 
 numNodes :: ExprTree a -> Int
-numNodes (LeafVar _) = 1
-numNodes (LeafConst _) = 1
-numNodes (NodeUnary _ t) = 1 + numNodes t
-numNodes (NodeBinary _ l r) = 1 + numNodes l + numNodes r
+numNodes (LVar _) = 1
+numNodes (LC _) = 1
+numNodes (NUn _ t) = 1 + numNodes t
+numNodes (NBin _ l r) = 1 + numNodes l + numNodes r
 
 evalTree :: Floating a => [(String, a)] -> ExprTree a -> a
-evalTree _ !(LeafConst !c) = c
-evalTree !vars !(LeafVar !(Var !v)) | Just !c <- lookup v vars = c
+evalTree _ !(LC !c) = c
+evalTree !vars !(LVar !(Var !v)) | Just !c <- lookup v vars = c
                                     | otherwise = error $ "Unknown var " ++ v
-evalTree !vars !(NodeUnary !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTree vars t
+evalTree !vars !(NUn !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTree vars t
                                   | otherwise = error $ "Unknown uf " ++ show f
-evalTree !vars !(NodeBinary !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
+evalTree !vars !(NBin !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
                                       | otherwise = error $ "Unknown bf " ++ show f
 
 atNodeBin :: (Int -> Int -> ExprTree a -> ExprTree a) -> Int -> Int -> (ExprTree a, ExprTree a) -> ExprTree a
@@ -105,46 +105,46 @@ subTree = subTree' 0
 
 subTree' :: Int -> Int -> ExprTree a -> ExprTree a
 subTree' i n t | i == n = t
-subTree' i n (LeafVar _) = walkFail "subTree: var node" i n
-subTree' i n (LeafConst _) = walkFail "subTree: const node" i n
-subTree' i n (NodeBinary _ l r) = atNodeBin subTree' i n (l, r)
-subTree' i n (NodeUnary _ t) = subTree' (i + 1) n t
+subTree' i n (LVar _) = walkFail "subTree: var node" i n
+subTree' i n (LC _) = walkFail "subTree: const node" i n
+subTree' i n (NBin _ l r) = atNodeBin subTree' i n (l, r)
+subTree' i n (NUn _ t) = subTree' (i + 1) n t
 
 repSubTree :: Int -> ExprTree a -> ExprTree a -> ExprTree a
 repSubTree = repSubTree' 0
 
 repSubTree' :: Int -> Int -> ExprTree a -> ExprTree a -> ExprTree a
 repSubTree' i n r _ | i == n = r
-repSubTree' i n r (LeafVar _) = walkFail "repSubTree: var node" i n
-repSubTree' i n r (LeafConst _) = walkFail "repSubTree: const node" i n
-repSubTree' i n r (NodeBinary f t1 t2) = NodeBinary f t1' t2'
+repSubTree' i n r (LVar _) = walkFail "repSubTree: var node" i n
+repSubTree' i n r (LC _) = walkFail "repSubTree: const node" i n
+repSubTree' i n r (NBin f t1 t2) = NBin f t1' t2'
     where (t1', t2') = atNodeBin2 (\i n t -> repSubTree' i n r t) i n (t1, t2)
-repSubTree' i n r (NodeUnary f t) = NodeUnary f (repSubTree' (i + 1) n r t)
+repSubTree' i n r (NUn f t) = NUn f (repSubTree' (i + 1) n r t)
 
 varTreeConsts :: ExprTree a -> (ExprTree a, [(String, a)])
 varTreeConsts = (\(x, y, z) -> (x, y)) . varTreeConsts' 0
 
 varTreeConsts' :: Int -> ExprTree a -> (ExprTree a, [(String, a)], Int)
-varTreeConsts' n t@(LeafVar _) = (t, [], n)
-varTreeConsts' n t@(LeafConst c) = (LeafVar (Var name), [(name, c)], n + 1)
+varTreeConsts' n t@(LVar _) = (t, [], n)
+varTreeConsts' n t@(LC c) = (LVar (Var name), [(name, c)], n + 1)
     where name = '_' : show n
-varTreeConsts' n (NodeUnary f t) = (\(x, y, z) -> (NodeUnary f x, y, z)) (varTreeConsts' n t)
-varTreeConsts' n (NodeBinary f l r) = (NodeBinary f l' r', lrep ++ rrep, rpos)
+varTreeConsts' n (NUn f t) = (\(x, y, z) -> (NUn f x, y, z)) (varTreeConsts' n t)
+varTreeConsts' n (NBin f l r) = (NBin f l' r', lrep ++ rrep, rpos)
     where (l', lrep, lpos) = varTreeConsts' n l
           (r', rrep, rpos) = varTreeConsts' lpos r
 
 fixTreeVars :: [(String, a)] -> ExprTree a -> ExprTree a
-fixTreeVars vals t@(LeafConst _) = t
-fixTreeVars vals t@(LeafVar (Var v)) | Just v' <- lookup v vals = LeafConst v'
+fixTreeVars vals t@(LC _) = t
+fixTreeVars vals t@(LVar (Var v)) | Just v' <- lookup v vals = LC v'
                                      | otherwise = t
-fixTreeVars vals (NodeUnary f t) = NodeUnary f (fixTreeVars vals t)
-fixTreeVars vals (NodeBinary f l r) = NodeBinary f (fixTreeVars vals l) (fixTreeVars vals r)
+fixTreeVars vals (NUn f t) = NUn f (fixTreeVars vals t)
+fixTreeVars vals (NBin f l r) = NBin f (fixTreeVars vals l) (fixTreeVars vals r)
 
 morphTreeConsts :: (a -> b) -> ExprTree a -> ExprTree b
-morphTreeConsts c (LeafConst ct) = LeafConst $ c ct
-morphTreeConsts _ (LeafVar v) = LeafVar v
-morphTreeConsts c (NodeUnary f t) = NodeUnary f (morphTreeConsts c t)
-morphTreeConsts c (NodeBinary f l r) = NodeBinary f (morphTreeConsts c l) (morphTreeConsts c r)
+morphTreeConsts c (LC ct) = LC $ c ct
+morphTreeConsts _ (LVar v) = LVar v
+morphTreeConsts c (NUn f t) = NUn f (morphTreeConsts c t)
+morphTreeConsts c (NBin f l r) = NBin f (morphTreeConsts c l) (morphTreeConsts c r)
 
 varredTreeJac :: (Real a, Floating a, Fractional a) => ExprTree a -> ([String], [String]) -> [Double] -> [Double] -> [Double]
 varredTreeJac !t !(!cNames, !vNames) !consts !vars = concat $ ((<$>) . (<$>)) realToFrac $ jacobian (\cts -> [evalTree (zip cNames cts ++ zip vNames (realToFrac <$> vars)) (morphTreeConsts realToFrac t)]) (realToFrac <$> consts)
@@ -153,68 +153,68 @@ walkFail :: String -> Int -> Int -> a
 walkFail s i n = error $ s ++ "; i = " ++ show i ++ "; n = " ++ show n
 
 isSameTreeStruct :: ExprTree a -> ExprTree a -> Bool
-isSameTreeStruct (LeafConst _) (LeafConst _) = True
-isSameTreeStruct (LeafVar v1) (LeafVar v2) = v1 == v2
-isSameTreeStruct (NodeUnary f1 t1) (NodeUnary f2 t2) = f1 == f2 && isSameTreeStruct t1 t2
-isSameTreeStruct (NodeBinary f1 l1 r1) (NodeBinary f2 l2 r2) = f1 == f2 && isSameTreeStruct l1 l2 && isSameTreeStruct r1 r2
+isSameTreeStruct (LC _) (LC _) = True
+isSameTreeStruct (LVar v1) (LVar v2) = v1 == v2
+isSameTreeStruct (NUn f1 t1) (NUn f2 t2) = f1 == f2 && isSameTreeStruct t1 t2
+isSameTreeStruct (NBin f1 l1 r1) (NBin f2 l2 r2) = f1 == f2 && isSameTreeStruct l1 l2 && isSameTreeStruct r1 r2
 isSameTreeStruct _ _ = False
 
 ufDiff :: (Fractional a, Num a) => UnaryFunc -> ExprTree a -> ExprTree a
-ufDiff Sin t = NodeUnary Cos t
-ufDiff Cos t = NodeBinary Mul (LeafConst (-1)) (NodeUnary Sin t)
-ufDiff Log t = NodeBinary Div (LeafConst 1) t
-ufDiff Tan t = NodeBinary Div (LeafConst 1) (NodeBinary Pow (NodeUnary Cos t) (LeafConst 2))
-ufDiff Asin t = NodeBinary Div (LeafConst 1) (NodeBinary Pow (NodeBinary Minus (LeafConst 1) (NodeBinary Pow t (LeafConst 2))) (LeafConst 0.5))
-ufDiff Acos t = NodeBinary Div (LeafConst (-1)) (NodeBinary Pow (NodeBinary Minus (LeafConst 1) (NodeBinary Pow t (LeafConst 2))) (LeafConst 0.5))
-ufDiff Atan t = NodeBinary Div (LeafConst 1) (NodeBinary Plus (LeafConst 1) (NodeBinary Pow t (LeafConst 2)))
+ufDiff Sin t = NUn Cos t
+ufDiff Cos t = NBin Mul (LC (-1)) (NUn Sin t)
+ufDiff Log t = NBin Div (LC 1) t
+ufDiff Tan t = NBin Div (LC 1) (NBin Pow (NUn Cos t) (LC 2))
+ufDiff Asin t = NBin Div (LC 1) (NBin Pow (NBin Minus (LC 1) (NBin Pow t (LC 2))) (LC 0.5))
+ufDiff Acos t = NBin Div (LC (-1)) (NBin Pow (NBin Minus (LC 1) (NBin Pow t (LC 2))) (LC 0.5))
+ufDiff Atan t = NBin Div (LC 1) (NBin Plus (LC 1) (NBin Pow t (LC 2)))
 
 bfDiff :: RealFloat a => BinaryFunc -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)-> ExprTree a
-bfDiff Plus _ (dl, dr) = NodeBinary Plus dl dr
-bfDiff Minus _ (dl, dr) = NodeBinary Minus dl dr
-bfDiff Mul (l, r) (dl, dr) = NodeBinary Plus (NodeBinary Mul l dr) (NodeBinary Mul dl r)
-bfDiff Div (l, r) (dl, dr) = NodeBinary Div t (NodeBinary Pow r (LeafConst 2))
-    where t = NodeBinary Minus (NodeBinary Mul dl r) (NodeBinary Mul l dr)
-bfDiff Pow (f, g) (df, dg) = NodeBinary Mul lt rt
-    where lt = NodeBinary Plus (NodeBinary Mul dg (NodeUnary Log f)) (NodeBinary Mul g (NodeBinary Div df f))
-          rt = NodeBinary Pow (LeafConst (exp 1)) (NodeBinary Mul g (NodeUnary Log f))
+bfDiff Plus _ (dl, dr) = NBin Plus dl dr
+bfDiff Minus _ (dl, dr) = NBin Minus dl dr
+bfDiff Mul (l, r) (dl, dr) = NBin Plus (NBin Mul l dr) (NBin Mul dl r)
+bfDiff Div (l, r) (dl, dr) = NBin Div t (NBin Pow r (LC 2))
+    where t = NBin Minus (NBin Mul dl r) (NBin Mul l dr)
+bfDiff Pow (f, g) (df, dg) = NBin Mul lt rt
+    where lt = NBin Plus (NBin Mul dg (NUn Log f)) (NBin Mul g (NBin Div df f))
+          rt = NBin Pow (LC (exp 1)) (NBin Mul g (NUn Log f))
 -- ^^^ here we used that (f^g)' = (e^(g ln f))' = (g ln f)' e^(g ln f)
 -- (g ln f)' is named lt, the rest is rt
 
 partDiff :: RealFloat a => Var -> ExprTree a -> ExprTree a
-partDiff _ (LeafConst _) = LeafConst 0
-partDiff v (LeafVar lv) | lv == v = LeafConst 1
-                        | otherwise = LeafConst 0
-partDiff v (NodeUnary f t) = simplifyStab $ NodeBinary Mul (ufDiff f t) (partDiff v t)
-partDiff v (NodeBinary f l r) = simplifyStab $ bfDiff f (l, r) (partDiff v l, partDiff v r)
+partDiff _ (LC _) = LC 0
+partDiff v (LVar lv) | lv == v = LC 1
+                        | otherwise = LC 0
+partDiff v (NUn f t) = simplifyStab $ NBin Mul (ufDiff f t) (partDiff v t)
+partDiff v (NBin f l r) = simplifyStab $ bfDiff f (l, r) (partDiff v l, partDiff v r)
 
 -- Better to place terminating optimizations at the top, obviously
 simplifyTree :: (RealFloat a) => ExprTree a -> ExprTree a
-simplifyTree (NodeBinary Plus (LeafConst 0.0) a) = a
-simplifyTree (NodeBinary Plus a (LeafConst 0.0)) = a
-simplifyTree (NodeBinary Pow _ (LeafConst 0.0)) = LeafConst 1.0
-simplifyTree (NodeBinary Pow l@(LeafConst 1.0) _) = l
-simplifyTree (NodeBinary Mul l@(LeafConst 0.0) _) = l
-simplifyTree (NodeBinary Mul _ l@(LeafConst 0.0)) = l
-simplifyTree (NodeUnary a (LeafConst x)) = LeafConst $ maybe fail ($ x) (lookup a unaryOps)
+simplifyTree (NBin Plus (LC 0.0) a) = a
+simplifyTree (NBin Plus a (LC 0.0)) = a
+simplifyTree (NBin Pow _ (LC 0.0)) = LC 1.0
+simplifyTree (NBin Pow l@(LC 1.0) _) = l
+simplifyTree (NBin Mul l@(LC 0.0) _) = l
+simplifyTree (NBin Mul _ l@(LC 0.0)) = l
+simplifyTree (NUn a (LC x)) = LC $ maybe fail ($ x) (lookup a unaryOps)
     where fail = failStr $ "Unable to find unary function " ++ show a
-simplifyTree (NodeBinary a (LeafConst x) (LeafConst y)) = LeafConst $ maybe fail (\op -> x `op` y) (lookup a binaryOps)
+simplifyTree (NBin a (LC x) (LC y)) = LC $ maybe fail (\op -> x `op` y) (lookup a binaryOps)
     where fail = failStr $ "Unable to find binary function " ++ show a
-simplifyTree (NodeBinary Pow a (LeafConst 1.0)) = simplifyTree a
-simplifyTree (NodeBinary Mul (LeafConst 1.0) a) = simplifyTree a
-simplifyTree (NodeBinary Mul a (LeafConst 1.0)) = simplifyTree a
-simplifyTree (NodeBinary Minus a b) | a == b = LeafConst 0.0
-simplifyTree (NodeBinary Minus a (LeafConst b)) | b < 0 = NodeBinary Plus a (LeafConst (-b))
-simplifyTree (NodeBinary f (LeafConst a) (LeafConst b)) | Just !f' <- lookup f binaryOps = LeafConst $ f' a b
+simplifyTree (NBin Pow a (LC 1.0)) = simplifyTree a
+simplifyTree (NBin Mul (LC 1.0) a) = simplifyTree a
+simplifyTree (NBin Mul a (LC 1.0)) = simplifyTree a
+simplifyTree (NBin Minus a b) | a == b = LC 0.0
+simplifyTree (NBin Minus a (LC b)) | b < 0 = NBin Plus a (LC (-b))
+simplifyTree (NBin f (LC a) (LC b)) | Just !f' <- lookup f binaryOps = LC $ f' a b
                                                         | otherwise = error $ "Unknown bf " ++ show f
-simplifyTree (NodeBinary Div a b) | a == b = LeafConst 1.0
-simplifyTree (NodeBinary f a b) | isConstNaN a' || isConstNaN b' = LeafConst $ 0.0 / 0.0
+simplifyTree (NBin Div a b) | a == b = LC 1.0
+simplifyTree (NBin f a b) | isConstNaN a' || isConstNaN b' = LC $ 0.0 / 0.0
                                 | a /= a' || b /= b' = simplifyTree n
                                 | otherwise = n
     where (a', b') = join (***) simplifyTree (a, b)
-          n = NodeBinary f a' b'
-          isConstNaN (LeafConst c) = isNaN c
+          n = NBin f a' b'
+          isConstNaN (LC c) = isNaN c
           isConstNaN _ = False
-simplifyTree (NodeUnary f a) = NodeUnary f (simplifyTree a)
+simplifyTree (NUn f a) = NUn f (simplifyTree a)
 simplifyTree t = t
 
 simplifyStab = simplifyTree

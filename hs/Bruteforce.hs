@@ -36,9 +36,9 @@ data BfState a = BfState {
     deriving (Show)
 
 instance Composable (ExprTree a) where
-    createVar = LeafVar . Var
-    compose1 = NodeUnary
-    compose2 = uncurry . NodeBinary
+    createVar = LVar . Var
+    compose1 = NUn
+    compose2 = uncurry . NBin
 
 combine :: Composable a => AnyFunc -> [a] -> [a]
 combine (UF f) ppls = [ compose1 f t | t <- ppls ]

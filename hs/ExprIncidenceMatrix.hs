@@ -61,10 +61,10 @@ evalMatrix !vals !(IncMatrix _ ops) = head $ foldr step [] ops
 vecTree t = st { nodesList = reverse $ nodesList st, prevNodes = reverse $ prevNodes st }
     where st = vecTree' emptyVecState t
 
-vecTree' st (LeafVar (Var v)) = st |++| LeafTNode v
-vecTree' st (LeafConst c) = st |++| LeafCNode c
-vecTree' st (NodeUnary f r) = vecTree' (st |++| UnNode f |++-| pos st) r
-vecTree' st (NodeBinary f l r) = vecTree' (st' |++-| b) r
+vecTree' st (LVar (Var v)) = st |++| LeafTNode v
+vecTree' st (LC c) = st |++| LeafCNode c
+vecTree' st (NUn f r) = vecTree' (st |++| UnNode f |++-| pos st) r
+vecTree' st (NBin f l r) = vecTree' (st' |++-| b) r
     where st' = vecTree' (st |++| BinNode f |++-| b) l
           b = pos st
 

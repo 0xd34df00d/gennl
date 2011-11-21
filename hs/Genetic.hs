@@ -217,15 +217,15 @@ mutateTree st g t = simplifyStab $ mutateTree' st g1 t (fst $ randomR (0, numNod
     where (g1, g2) = split g
 
 mutateTree' :: (RandomGen g, Random a, Num a) => GAState g (ExprTree a) -> g -> ExprTree a -> Int -> Int -> ExprTree a
-mutateTree' st g (NodeBinary f l r) n i | n == i = NodeBinary (mutGene f (binaryOpsPool $ cfg st) g) l r
-                                        | nl + i >= n = NodeBinary f (mutateTree' st g l n (i + 1)) r
-                                        | otherwise = NodeBinary f l (mutateTree' st g r n (i + nl + 1))
+mutateTree' st g (NBin f l r) n i | n == i = NBin (mutGene f (binaryOpsPool $ cfg st) g) l r
+                                        | nl + i >= n = NBin f (mutateTree' st g l n (i + 1)) r
+                                        | otherwise = NBin f l (mutateTree' st g r n (i + nl + 1))
                                             where nl = numNodes l
-mutateTree' st g (NodeUnary f t) n i | n == i = NodeUnary (mutGene f (unaryOpsPool $ cfg st) g) t
-                                     | otherwise = NodeUnary f (mutateTree' st g t n (i + 1))
-mutateTree' st g l@(LeafVar (Var v)) n i | n == i = LeafVar $ Var $ mutGene v (vars $ cfg st) g
+mutateTree' st g (NUn f t) n i | n == i = NUn (mutGene f (unaryOpsPool $ cfg st) g) t
+                                     | otherwise = NUn f (mutateTree' st g t n (i + 1))
+mutateTree' st g l@(LVar (Var v)) n i | n == i = LVar $ Var $ mutGene v (vars $ cfg st) g
                                          | otherwise = error $ "WTF? Var node, i = " ++ show i ++ "; n = " ++ show n
-mutateTree' st g l@(LeafConst _) n i | n == i = LeafConst $ fst (random g) * 100
+mutateTree' st g l@(LC _) n i | n == i = LC $ fst (random g) * 100
                                      | otherwise = error $ "WTF? Const node, i = " ++ show i ++ "; n = " ++ show n
 
 mutGene :: (Eq a, RandomGen g) => a -> [a] -> g -> a

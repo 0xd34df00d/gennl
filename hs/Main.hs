@@ -28,7 +28,8 @@ simplified s = applyP' simplifyStab s
 --incMatrix s = applyP' toIncMatrix s
 
 runStuff (Left m) _ _ _ = error $ show m
-runStuff (Right recs) num pts g = runStuff' (map (map read) (take (pts * pts) recs)) num g
+runStuff (Right recs) num pts g = runStuff' (map (map read) (take (pts * pts) recs')) num g
+    where recs' = map (\(x:y:z:[]) -> y:z:x:[]) recs
 
 runStuff' recs num g = (pretty a, fit, iter st, map snd $ fits st)
     where defGA = initPpl num $ initGA (cfg { vars = ["x", "y"], testSet = map (take 2 &&& head . drop 2) recs, optNum = num } ) g
