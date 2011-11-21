@@ -48,7 +48,7 @@ realLeaf = LeafConst
 varLeaf = LeafVar . Var
 
 unaryNode s = NodeUnary <$> lookup s al 
-    where al = [ ("sin", Sin), ("cos", Cos), ("log", Log) ]
+    where al = [ ("sin", Sin), ("cos", Cos), ("log", Log), ("tan", Tan), ("atan", Atan), ("asin", Asin), ("acos", Acos) ]
 
 binaryNode s = NodeBinary <$> lookup s al
     where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
@@ -159,8 +159,38 @@ isSameTreeStruct (NodeUnary f1 t1) (NodeUnary f2 t2) = f1 == f2 && isSameTreeStr
 isSameTreeStruct (NodeBinary f1 l1 r1) (NodeBinary f2 l2 r2) = f1 == f2 && isSameTreeStruct l1 l2 && isSameTreeStruct r1 r2
 isSameTreeStruct _ _ = False
 
+ufDiff :: (Fractional a, Num a) => UnaryFunc -> ExprTree a -> ExprTree a
+ufDiff Sin t = NodeUnary Cos t
+ufDiff Cos t = NodeBinary Mul (LeafConst (-1)) (NodeUnary Sin t)
+ufDiff Log t = NodeBinary Div (LeafConst 1) t
+ufDiff Tan t = NodeBinary Div (LeafConst 1) (NodeBinary Pow (NodeUnary Cos t) (LeafConst 2))
+ufDiff Asin t = NodeBinary Div (LeafConst 1) (NodeBinary Pow (NodeBinary Minus (LeafConst 1) (NodeBinary Pow t (LeafConst 2))) (LeafConst 0.5))
+ufDiff Acos t = NodeBinary Div (LeafConst (-1)) (NodeBinary Pow (NodeBinary Minus (LeafConst 1) (NodeBinary Pow t (LeafConst 2))) (LeafConst 0.5))
+ufDiff Atan t = NodeBinary Div (LeafConst 1) (NodeBinary Plus (LeafConst 1) (NodeBinary Pow t (LeafConst 2)))
+
+bfDiff :: RealFloat a => BinaryFunc -> (ExprTree a, ExprTree a) -> (ExprTree a, ExprTree a)-> ExprTree a
+bfDiff Plus _ (dl, dr) = NodeBinary Plus dl dr
+bfDiff Minus _ (dl, dr) = NodeBinary Minus dl dr
+bfDiff Mul (l, r) (dl, dr) = NodeBinary Plus (NodeBinary Mul l dr) (NodeBinary Mul dl r)
+bfDiff Div (l, r) (dl, dr) = NodeBinary Div t (NodeBinary Pow r (LeafConst 2))
+    where t = NodeBinary Minus (NodeBinary Mul dl r) (NodeBinary Mul l dr)
+bfDiff Pow (f, g) (df, dg) = NodeBinary Mul lt rt
+    where lt = NodeBinary Plus (NodeBinary Mul dg (NodeUnary Log f)) (NodeBinary Mul g (NodeBinary Div df f))
+          rt = NodeBinary Pow (LeafConst (exp 1)) (NodeBinary Mul g (NodeUnary Log f))
+-- ^^^ here we used that (f^g)' = (e^(g ln f))' = (g ln f)' e^(g ln f)
+-- (g ln f)' is named lt, the rest is rt
+
+partDiff :: RealFloat a => Var -> ExprTree a -> ExprTree a
+partDiff _ (LeafConst _) = LeafConst 0
+partDiff v (LeafVar lv) | lv == v = LeafConst 1
+                        | otherwise = LeafConst 0
+partDiff v (NodeUnary f t) = simplifyStab $ NodeBinary Mul (ufDiff f t) (partDiff v t)
+partDiff v (NodeBinary f l r) = simplifyStab $ bfDiff f (l, r) (partDiff v l, partDiff v r)
+
 -- Better to place terminating optimizations at the top, obviously
 simplifyTree :: (RealFloat a) => ExprTree a -> ExprTree a
+simplifyTree (NodeBinary Plus (LeafConst 0.0) a) = a
+simplifyTree (NodeBinary Plus a (LeafConst 0.0)) = a
 simplifyTree (NodeBinary Pow _ (LeafConst 0.0)) = LeafConst 1.0
 simplifyTree (NodeBinary Pow l@(LeafConst 1.0) _) = l
 simplifyTree (NodeBinary Mul l@(LeafConst 0.0) _) = l
