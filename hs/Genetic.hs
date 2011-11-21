@@ -78,7 +78,7 @@ initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
 initGA c g = GAState c g 0 [] [] []
 
 initPpl :: (RandomGen g, GAble a) => Int -> GAState g a -> GAState g a
-initPpl n st = st { ppl = take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c)) g1, randGen = g2 }
+initPpl n st = st { ppl = map simplify $ take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c)) g1, randGen = g2 }
     where (g1, g2) = split $ randGen st
           c = cfg st
 
