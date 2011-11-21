@@ -11,16 +11,20 @@ data BinFuncInfo = BinFuncInfo {
     }
     deriving (Show, Eq)
 
-data UnaryFunc = Sin | Cos | Log
+data UnaryFunc = Sin | Cos | Log | Tan | Asin | Acos | Atan
     deriving (Show, Eq, Ord)
 
 instance Formattable UnaryFunc where
     pretty Sin = "sin"
     pretty Cos = "cos"
     pretty Log = "log"
+    pretty Tan = "tan"
+    pretty Asin = "asin"
+    pretty Acos = "acos"
+    pretty Atan = "atan"
 
 unaryOps :: Floating a => [(UnaryFunc, a -> a)]
-unaryOps = [ (Sin, sin), (Cos, cos), (Log, log) ]
+unaryOps = [ (Sin, sin), (Cos, cos), (Log, log), (Tan, tan), (Asin, asin), (Acos, acos), (Atan, atan) ]
 
 unaryOpsOnly = map fst unaryOps
 
