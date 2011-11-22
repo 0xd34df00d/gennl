@@ -66,8 +66,8 @@ class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (Comput
 
 defConfig :: (GAble a) => GAConfig a
 defConfig = GAConfig
-                (map fst unaryOps)
-                (map fst binaryOps)
+                unaryOpsOnly
+                binaryOpsOnly
                 []
                 []
                 4

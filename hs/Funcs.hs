@@ -23,10 +23,16 @@ instance Formattable UnaryFunc where
     pretty Acos = "acos"
     pretty Atan = "atan"
 
-unaryOps :: Floating a => [(UnaryFunc, a -> a)]
-unaryOps = [ (Sin, sin), (Cos, cos), (Log, log), (Tan, tan), (Asin, asin), (Acos, acos), (Atan, atan) ]
+unaryOps :: Floating a => UnaryFunc -> a -> a
+unaryOps Sin = sin
+unaryOps Cos = cos
+unaryOps Log = log
+unaryOps Tan = tan
+unaryOps Asin = asin
+unaryOps Acos = acos
+unaryOps Atan = atan
 
-unaryOpsOnly = map fst unaryOps
+unaryOpsOnly = [ Sin, Cos, Log, Tan, Asin, Acos, Atan ]
 
 data BinaryFunc = Plus | Minus | Mul | Div | Pow
     deriving (Show, Eq, Ord)
@@ -38,10 +44,14 @@ instance Formattable BinaryFunc where
     pretty Div = "/"
     pretty Pow = "**"
 
-binaryOps :: Floating a => [(BinaryFunc, a -> a -> a)]
-binaryOps = [ (Plus, (+)), (Minus, (-)), (Mul, (*)), (Div, (/)), (Pow, (**)) ]
+binaryOps :: Floating a => BinaryFunc -> a -> a -> a
+binaryOps Plus = (+)
+binaryOps Minus = (-)
+binaryOps Mul = (*)
+binaryOps Div = (/)
+binaryOps Pow = (**)
 
-binaryOpsOnly = map fst binaryOps
+binaryOpsOnly = [ Plus, Minus, Mul, Div, Pow ]
 
 binFuncInfos :: [(BinaryFunc, BinFuncInfo)]
 binFuncInfos = [

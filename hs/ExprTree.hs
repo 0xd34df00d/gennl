@@ -82,13 +82,11 @@ numNodes (NUn _ t) = 1 + numNodes t
 numNodes (NBin _ l r) = 1 + numNodes l + numNodes r
 
 evalTree :: Floating a => [(String, a)] -> ExprTree a -> a
-evalTree _ !(LC !c) = c
-evalTree !vars !(LVar !(Var !v)) | Just !c <- lookup v vars = c
-                                 | otherwise = error $ "Unknown var " ++ v
-evalTree !vars !(NUn !f !t) | Just !f' <- lookup f unaryOps = f' $ evalTree vars t
-                            | otherwise = error $ "Unknown uf " ++ show f
-evalTree !vars !(NBin !f !l !r) | Just !f' <- lookup f binaryOps = f' (evalTree vars l) (evalTree vars r)
-                                | otherwise = error $ "Unknown bf " ++ show f
+evalTree _ (LC c) = c
+evalTree vars (LVar (Var v)) | Just c <- lookup v vars = c
+                             | otherwise = error $ "Unknown var " ++ v
+evalTree vars (NUn f t) = unaryOps f $ evalTree vars t
+evalTree vars (NBin f l r) = binaryOps f (evalTree vars l) (evalTree vars r)
 
 atNodeBin :: (Int -> Int -> ExprTree a -> ExprTree a) -> Int -> Int -> (ExprTree a, ExprTree a) -> ExprTree a
 atNodeBin f i n (l, r) | nl +i >= n = f (i + 1) n l
@@ -197,17 +195,13 @@ simplifyTree (NBin Pow _ (LC 0.0)) = LC 1.0
 simplifyTree (NBin Pow l@(LC 1.0) _) = l
 simplifyTree (NBin Mul l@(LC 0.0) _) = l
 simplifyTree (NBin Mul _ l@(LC 0.0)) = l
-simplifyTree (NUn a (LC x)) = LC $ maybe fail ($ x) (lookup a unaryOps)
-    where fail = failStr $ "Unable to find unary function " ++ show a
-simplifyTree (NBin a (LC x) (LC y)) = LC $ maybe fail (\op -> x `op` y) (lookup a binaryOps)
-    where fail = failStr $ "Unable to find binary function " ++ show a
+simplifyTree (NUn a (LC x)) = LC $ unaryOps a x
+simplifyTree (NBin a (LC x) (LC y)) = LC $ binaryOps a x y
 simplifyTree (NBin Pow a (LC 1.0)) = simplifyTree a
 simplifyTree (NBin Mul (LC 1.0) a) = simplifyTree a
 simplifyTree (NBin Mul a (LC 1.0)) = simplifyTree a
 simplifyTree (NBin Minus a b) | a == b = LC 0.0
 simplifyTree (NBin Minus a (LC b)) | b < 0 = NBin Plus a (LC (-b))
-simplifyTree (NBin f (LC a) (LC b)) | Just !f' <- lookup f binaryOps = LC $ f' a b
-                                                        | otherwise = error $ "Unknown bf " ++ show f
 simplifyTree (NBin Div a b) | a == b = LC 1.0
 simplifyTree (NBin f a b) | isConstNaN a' || isConstNaN b' = LC $ 0.0 / 0.0
                           | a /= a' || b /= b' = simplifyTree n
