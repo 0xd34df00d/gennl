@@ -146,9 +146,9 @@ morphTreeConsts _ (LVar v) = LVar v
 morphTreeConsts c (NUn f t) = NUn f (morphTreeConsts c t)
 morphTreeConsts c (NBin f l r) = NBin f (morphTreeConsts c l) (morphTreeConsts c r)
 
-varredTreeJac :: (RealFloat a) => ExprTree a -> ([String], [String]) -> [Double] -> [Double] -> [Double]
-varredTreeJac t (cNames, vNames) consts vars = realToFrac <$> map (evalTree vals) parts
-    where vals = zip (cNames ++ vNames) (map realToFrac $ consts ++ vars)
+varredTreeJac :: (RealFloat a) => ExprTree a -> ([String], [String]) -> [a] -> [a] -> [a]
+varredTreeJac t (cNames, vNames) consts vars = map (evalTree vals) parts
+    where vals = zip (cNames ++ vNames) (consts ++ vars)
           parts = map (\v -> partDiff (Var v) t) cNames
 
 walkFail :: String -> Int -> Int -> a

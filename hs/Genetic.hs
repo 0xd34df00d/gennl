@@ -52,7 +52,7 @@ class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (Comput
     randGAInst :: RandomGen g => [String] -> Int -> g -> (a, g)
     variateConsts :: a -> (a, [(String, ComputeRes a)])
     fixVars :: [(String, ComputeRes a)] -> a -> a
-    jacForConsts :: a -> ([String], [String]) -> [Double] -> [Double] -> [Double]
+    jacForConsts :: a -> ([String], [String]) -> [ComputeRes a] -> [ComputeRes a] -> [ComputeRes a]
     complexity :: a -> Double
     complexity _ = 1.0
     res2double :: ComputeRes a -> Double
@@ -109,15 +109,12 @@ optimizePplConsts = do
     put st { ppl = opted ++ opt, optimized = opted ++ opt, fits = [] } --filter (\x -> fst x `elem` opted) (fits st) }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
-runOpt vars dat cv a = {-("OPTIMIZING", pretty a) `traceShow`-} realToFrac <$> runOpt' vars ((\(a, b) -> (realToFrac b, realToFrac <$> a)) <$> dat) (second realToFrac <$> cv) a
-
-runOpt' :: (GAble a) => [String] -> [(Double, [Double])] -> [(String, Double)] -> a -> [Double]
-runOpt' vars dat cv a = LevMar.fitModel (gaModel (a, cvNames ++ vars)) j dat (map snd cv)
+runOpt vars dat cv a = LevMar.fitModel (gaModel (a, cvNames ++ vars)) j (map (\(a, b) -> (b, a)) dat) (map snd cv)
     where cvNames = fst <$> cv
           j (c, v) = jacForConsts a (cvNames, vars) c v
 
-gaModel :: (GAble a) => (a, [String]) -> ([Double], [Double]) -> Double
-gaModel !(!a, !names) !(!consts, !vars) = realToFrac $ compute ((second realToFrac) <$> (zip names (consts ++ vars))) a
+gaModel :: (GAble a) => (a, [String]) -> ([ComputeRes a], [ComputeRes a]) -> ComputeRes a
+gaModel !(!a, !names) !(!consts, !vars) = compute (zip names (consts ++ vars)) a
 --{-# SPECIALIZE gaModel :: (ExprTree Double, [String]) -> ([Double], [Double]) -> Double #-}
 
 optimizeConsts :: (GAble a) => GAConfig a -> a -> a
