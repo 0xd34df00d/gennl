@@ -5,12 +5,6 @@ import Data.List
 
 import Formattable
 
-data BinFuncInfo = BinFuncInfo {
-        comm :: Bool,
-        assoc :: Bool
-    }
-    deriving (Show, Eq)
-
 data UnaryFunc = Sin | Cos | Log | Tan | Asin | Acos | Atan
     deriving (Show, Eq, Ord)
 
@@ -53,11 +47,15 @@ binaryOps Pow = (**)
 
 binaryOpsOnly = [ Plus, Minus, Mul, Div, Pow ]
 
-binFuncInfos :: [(BinaryFunc, BinFuncInfo)]
-binFuncInfos = [
-                    (Plus, BinFuncInfo True True),
-                    (Minus, BinFuncInfo False False),
-                    (Mul, BinFuncInfo True True),
-                    (Div, BinFuncInfo False False),
-                    (Pow, BinFuncInfo False False)
-               ]
+data BinFuncInfo = BinFuncInfo {
+        comm :: Bool,
+        assoc :: Bool
+    }
+    deriving (Show, Eq)
+
+binFInf :: BinaryFunc -> BinFuncInfo
+binFInf Plus = BinFuncInfo True True
+binFInf Minus = BinFuncInfo False False
+binFInf Mul = BinFuncInfo True True
+binFInf Div = BinFuncInfo False False
+binFInf Pow = BinFuncInfo False False
