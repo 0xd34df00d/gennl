@@ -70,6 +70,9 @@ idMat n = Matrix (array ((0, 0), (n - 1, n - 1)) [((i, j), f i j) | i <- [0..n-1
     where f i j | i == j = 1
                 | otherwise = 0
 
+emptyMat :: Num e => (Int, Int) -> Matrix e
+emptyMat (r, c) = Matrix (array ((0, 0), (r - 1, c - 1)) [((i, j), 0) | i <- [0..r-1], j <- [0..c-1]])
+
 nullMat :: Matrix e
 nullMat = Matrix (array ((0, 0), (-1, -1)) [])
 
