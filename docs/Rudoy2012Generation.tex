@@ -681,7 +681,7 @@ P_1 = l_1 n + l_2 n^2 + \dots + l_n n^p = \sum_{i=1}^p l_i P_0^i,
   \[
   l_m (l_m^{m+1} n^{m^2})^m = l_m l_m^{m(m+1)} n^{m^3} = l_m^{m^2 + m + 1} n^{m^3}.
   \]
-  И вообще, скорость роста количества порожденных суперпозицийможно оценить
+  И вообще, скорость роста количества порожденных суперпозиций можно оценить
   как:
   \[
   | \mathcal{F}_k | = \mathcal{O} (l_m^{\sum_{i=0}^{k-1} m^i} n^{m^k}).
@@ -908,7 +908,7 @@ $\lambda = \lambda_i$ и~$\lambda = \frac{\lambda_i}{\nu}$. В~случае,
   \item $\xi_1 < \xi \leq \xi_2$: результатом алгоритма является	числовой
 	параметр.
   \item $\xi_2 < \xi \leq \xi_3$: результатом алгоритма является некоторая
-	сулчайно выбранная унарная функция, для определения аргумента которой
+	случайно выбранная унарная функция, для определения аргумента которой
 	данный алгоритм рекурсивно запускается еще раз.
   \item $\xi_3 < \xi$: результатом алгоритма является некоторая случайно
 	выбранная бинарная функция, аргументы которой порождаются аналогичны
@@ -1013,7 +1013,7 @@ $\tau$~--- коэффициент, характеризующий желаему
 
 Использованные параметры алгоритма \ref{algo:SA}: $N_{max} = 200, I_{max} = 50,
 \hat{Q} = 0.95, \tau = 10, \alpha = 0.05$. При отсутствии улучшения результатов
-в течение нескольких итераций, алгоритм \ref{algo:SA} также завершался.
+в течение нескольких итераций подряд алгоритм \ref{algo:SA} также завершался.
 
 В таблице \ref{tabl:results} приведены некоторые из наилучших суперпозиций,
 порожденных в результате работы алгоритма \ref{algo:SA}. Указан номер
@@ -1027,15 +1027,19 @@ $\tau$~--- коэффициент, характеризующий желаему
 \begin{table}[h]
   \begin{tabular}{| c | c | c | c |} \hline
 	$i$ & Суперпозиция													& $S_f$				& $C_f$ \\ \hline
-	9	& $\displaystyle \left(\frac{1.36}{xy}\right)^{0.48}$			& $\approx 4.94$	& 7		\\ \hline
-	14	& $\displaystyle (15.8y + \arcsin y)^{-0.48}$					& $\approx 5.28$	& 8		\\ \hline
-	13	& $\displaystyle (yx^{0.882} + \arcsin y)^{-0.482}$				& $\approx 4.89$	& 10	\\ \hline
-	8	& $\displaystyle 0.125 \frac{y}{(y^2)^{0.8+y}}$					& $\approx 4.79$	& 11	\\ \hline
-	14	& $\displaystyle \frac{\frac{3.86 \cdot 10^{11} + y}{\frac{y\frac{1.227 \cdot 10^{11}}{x^y}-2.46 \cdot 10^{8}}{y \cos \left(\frac{\frac{-5.89 \cdot 10^{-3}+y}{\frac{y - 5.47 \cdot 10^{-3}}{y \cos y}}}{y}\right)}}}{y^y \cos y + xy}$	& $\approx 3.51$	& 42		\\ \hline
+	9	& $\displaystyle \left(\frac{1.36}{xy}\right)^{0.48}$			& $\approx 0.0182$	& 7		\\ \hline
+	14	& $\displaystyle (15.8y + \arcsin y)^{-0.48}$					& $\approx 0.0208$	& 8		\\ \hline
+	13	& $\displaystyle (yx^{0.882} + \arcsin y)^{-0.482}$				& $\approx 0.0178$	& 10	\\ \hline
+	8	& $\displaystyle 0.125 \frac{y}{(y^2)^{0.8+y}}$					& $\approx 0.0171$	& 11	\\ \hline
+	14	& $\displaystyle \frac{\frac{3.86 \cdot 10^{11} + y}{\frac{y\frac{1.227 \cdot 10^{11}}{x^y}-2.46 \cdot 10^{8}}{y \cos \left(\frac{\frac{-5.89 \cdot 10^{-3}+y}{\frac{y - 5.47 \cdot 10^{-3}}{y \cos y}}}{y}\right)}}}{y^y \cos y + xy}$	& $\approx 0.092$	& 42		\\ \hline
   \end{tabular}
   \label{tabl:results}
   \caption{Результаты вычислительного эксперимента}
 \end{table}
+
+На рисунках \ref{fig:1_iso} и \ref{fig:1_proj} отображены изометрическая
+проекция и проекция на одну из плоскостей для суперпозиции
+$\left(\frac{1.36}{xy}\right)^{0.48}$.
 
 \begin{figure}[h]
   \includegraphics[scale=0.80,angle=-90]{figs/1-iso.eps}
@@ -1043,21 +1047,10 @@ $\tau$~--- коэффициент, характеризующий желаему
   \label{fig:1_iso}
 \end{figure}
 
-На рисунках \ref{fig:1_iso} и \ref{fig:1_proj} отображены изометрическая
-проекция и проекция на одну из плоскостей для суперпозиции
-$\left(\frac{1.36}{xy}\right)^{0.48}$. На рисунке \ref{fig:2_proj}
-изображена проекция последней из приведенных в таблице \ref{tabl:results} суперпозиций.
-
 \begin{figure}[h]
   \includegraphics[scale=0.80,angle=-90]{figs/1-proj.eps}
   \caption{Проекция результирующей суперпозиции}
   \label{fig:1_proj}
-\end{figure}
-
-\begin{figure}[h]
-  \includegraphics[scale=0.80,angle=-90]{figs/HolSh-proj.eps}
-  \caption{Проекция результирующей суперпозиции}
-  \label{fig:2_proj}
 \end{figure}
 
 \section{Заключение}
