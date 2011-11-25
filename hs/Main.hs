@@ -4,6 +4,7 @@ import System.Environment
 import Control.Arrow
 import Data.List
 import Data.Either
+import Data.Functor ((<$>))
 import Random
 import Debug.Trace
 import Numeric.FAD
@@ -38,13 +39,25 @@ runStuff' recs num g = (pretty a, fit, iter st, map snd $ fits st)
 
 genSynth f ni nj = intercalate "\r\n" $ map (intercalate "," . map show) [ [i, j, f i j ] | i <- map (+3) [1..ni], j <- map (+3) [1..nj] ]
 
-main' :: Int -> Int -> IO ()
+main' :: Int -> Double -> IO ()
 main' num pts = do
     --let recs = parseCSV (genSynth (\x y -> (exp 1) ** ((x / y + y / x) / 10) + 1) pts pts ++ "\r\n")
+    --let recs = parseCSV (genSynth (\x y -> x * cos (y)) pts pts ++ "\r\n")
     file <- readFile "options.dat.txt"
     let recs = parseCSV file
     g <- newStdGen
-    print $ runStuff recs num pts g
+    print $ runStuff recs num (floor pts) g
+
+sse = do
+    file <- readFile "options.dat.txt"
+    let recs = parseCSV file
+    print $ sse' recs
+
+sse' (Left _) = error ":("
+sse' (Right recs) = sse'' $ (read <$>) <$> recs
+
+sse'' recs = sqrt $ sum $ map (\(z:x:y:[]) -> (f x y - z) ** 2) recs
+    where f x y = ((3.86e11)/((((1.227e11/(x**y))*y)-2.46e8)/(cos ((((-5.89e-3+y)/((y-5.47e-3)/(cos (y)*y)))/y))*y)))/(cos (y)*((y**y)+(y*x)))
 
 main = do
     args <- getArgs
