@@ -190,16 +190,16 @@ partDiff v (NBin f l r) = bfDiff f (l, r) (partDiff v l, partDiff v r)
 -- Better to place terminating optimizations at the top, obviously
 simplifyTree :: (RealFloat a) => ExprTree a -> ExprTree a
 simplifyTree (NBin Plus (LC 0.0) a) = a
-simplifyTree (NBin Plus a (LC 0.0)) = a
 simplifyTree (NBin Pow _ (LC 0.0)) = LC 1.0
 simplifyTree (NBin Pow l@(LC 1.0) _) = l
-simplifyTree (NBin Mul l@(LC 0.0) _) = l
 simplifyTree (NBin Mul _ l@(LC 0.0)) = l
 simplifyTree (NUn a (LC x)) = LC $ unaryOps a x
 simplifyTree (NBin a (LC x) (LC y)) = LC $ binaryOps a x y
+simplifyTree (NBin f a r@(LC c)) | comm $ binFInf f = simplifyTree $ NBin f (simplifyTree r) a
+simplifyTree (NBin f l r) | numNodes l > numNodes r && (comm $ binFInf f) = simplifyTree $ NBin f r l
+simplifyTree (NBin f1 (LC lc) (NBin f2 (LC rc) t)) | f1 == f2 && (assoc $ binFInf f1) = simplifyTree $ NBin f1 (LC $ binaryOps f1 lc rc) (simplifyTree t)
 simplifyTree (NBin Pow a (LC 1.0)) = simplifyTree a
 simplifyTree (NBin Mul (LC 1.0) a) = simplifyTree a
-simplifyTree (NBin Mul a (LC 1.0)) = simplifyTree a
 simplifyTree (NBin Minus a b) | a == b = LC 0.0
 simplifyTree (NBin Minus a (LC b)) | b < 0 = NBin Plus a (LC (-b))
 simplifyTree (NBin Div a b) | a == b = LC 1.0
