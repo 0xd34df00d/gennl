@@ -14,6 +14,7 @@
 \usepackage{listings}
 \usepackage{float}
 \usepackage{verbatim}
+\usepackage{placeins}
 \usetikzlibrary{shapes,arrows}
 \usetikzlibrary{decorations.pathmorphing}
 
@@ -57,13 +58,13 @@
 
 \section{Введение}
 
-В~ряде приложений \cite{Barmpalexis201175, Shi:2011:CRM, DOI:10.1504/IJCENT.2010.038358}
+В~ряде приложений \cite{duffy:1999:srised,Barmpalexis201175,Schmidt:2009:GPTP}
 возникает задача восстановления регрессии по набору измеренных данных.
 При этом предполагается, что модель должна иметь возможность быть
 проинтерпретированной экспертом в~контексте предметной области.
 
 Одним из методов, позволяющих получать интерпретируемые модели, является
-символьная регрессия \cite{davidson:2000:snrea, reference/ml/X10vc},
+символьная регрессия \cite{davidson:2000:snrea, reference/ml/X10vc, StrijovW10},
 согласно которой измеряемые данные приближаются некоторой математической
 формулой, например, $ \sin x^2 + 2x $ или $\log x - \frac{e^x}{x} $.
 При решении регрессионной задачи данные приближаются различными формулами,
@@ -412,9 +413,9 @@ $f = \sin (\ln x_1) + \frac{x_2^3}{2}$ (см. рис \ref{fig:expr_tree_example}
 
 \begin{figure}[h]
   \begin{tikzpicture}
-	\scalefont{2}
+	\scalefont{4}
 	\tikzstyle{n} = [draw, inner sep=2pt, fill=red!20]
-	  \begin{dot2tex}[dot,options=-tmath,scale=0.5]
+	  \begin{dot2tex}[dot,options=-tmath,scale=0.4]
 		digraph G1 {
 		  node [shape="circle",style="n"];
 		  
@@ -753,6 +754,8 @@ $f$, не входящее в область определения функци
 а затем удалить из этого множества все суперпозиции, не удовлетворяющие
 сформулированному признаку.
 
+% DIPLOMA
+\begin{comment}
 \subsection{Множество <<минимальных>> суперпозиций}
 
 В~ходе работы алгоритма могут возникать суперпозиции вида $x + x$ и~$2x$,
@@ -796,6 +799,7 @@ $\cos$ связаны известным тригонометрическим с
 набора правил такого вида вкупе с использованием только <<независимых>>
 тригонометрических функций, то есть, по факту, какой-нибудь одной из них
 и еще одной обратной.
+\end{comment}
 
 \section{Алгоритм Левенберга-Марквардта и~мультистарт}
 
@@ -1001,15 +1005,84 @@ $\tau$~--- коэффициент, характеризующий желаему
 \section{Вычислительный эксперимент}
 
 В~вычислительном эксперименте восстанавливается регрессионная зависимость
-волатильности опциона от его стоимости и сроков исполнения. Используются
-исторические данные о волатильности опционов Brent Crude Oil. Срок действия
-опциона~--- полгода, с 02.01.2001 по 26.06.2001, тип~--- право на продажу
-базового инструмента. Базовым инструментом в~данном случае является нефть.
-Использовались ежедневные цены закрытия опциона и~базового инструмета.
+волатильности опциона от его стоимости и сроков исполнения
+\cite{daglish07theory,strijov09jct}. Используются исторические данные о
+волатильности опционов Brent Crude Oil. Срок действия опциона~--- полгода,
+с 02.01.2001 по 26.06.2001, тип~--- право на продажу базового инструмента.
+Базовым инструментом в~данном случае является нефть. Использовались
+ежедневные цены закрытия опциона и~базового инструмета.
 
 Данный инструмент имеет низкую волатильность, вследствие чего среди данных
 нет выбросов. В~данных имется пропуски, так как опционы с ценами, далекими
 от цен базового инструмента, не торговались сразу после выпуска опционов.
+
+\begin{table}
+  \begin{tabular}{c c}
+	\begin{tikzpicture}
+	  \scalefont{4}
+	  \tikzstyle{n} = [draw, inner sep=4pt, fill=red!20]
+	  \begin{dot2tex}[dot,options=-tmath,scale=0.4]
+		digraph G1 {
+		  node [shape="circle",style="n"];
+		  
+		  Pow [label="\bullet ^ \bullet"];
+		  Div [label="\div"];
+		  Mul [label="\bullet \times \bullet"];
+		  X [label="$x$"];
+		  Y [label="$y$"];
+		  C1 [label="0.48"];
+		  C2 [label="1.36"];
+
+		  Pow -> Div;
+		  Pow -> C1;
+
+		  Div -> C2;
+		  Div -> Mul;
+
+		  Mul -> X;
+		  Mul -> Y;
+		}
+	  \end{dot2tex}
+	\end{tikzpicture} & \begin{tikzpicture}
+	  \scalefont{4}
+	  \tikzstyle{n} = [draw, inner sep=4pt, fill=red!20]
+	  \begin{dot2tex}[dot,options=-tmath,scale=0.4]
+		digraph G3 {
+		  node [shape="circle",style="n"];
+		  
+		  Pow [label="\bullet ^ \bullet"];
+		  Plus [label="\bullet + \bullet"];
+		  Mul [label="\bullet \times \bullet"];
+		  C1 [label="15.8"];
+		  Y1 [label="$y$"];
+		  Asin [label="\arcsin"];
+		  Y2 [label="$y$"];
+		  C2 [label="-0.48"];
+
+		  Pow -> Plus;
+		  Pow -> C2;
+
+		  Plus -> Mul;
+		  Plus -> Asin;
+
+		  Mul -> Y1;
+		  Mul -> C1;
+
+		  Asin -> Y2;
+		}
+	  \end{dot2tex}
+	\end{tikzpicture} \\
+	Граф суперпозиции $\left(\frac{1.36}{xy}\right)^{0.48}$ & Граф суперпозиции $(15.8y + \arcsin y)^{-0.48}$
+  \end{tabular}
+  \caption{Графы результирующих суперпозиций}
+  \label{fig:expr_tree_res}
+\end{table}
+
+В ходе предобработки данных выяснено, что для больших значений волатильности
+зависимость преобладает существенно неоднозначный характер, поэтому для облегчения
+аналитического описания моделировалась зависимость цены от волатильности
+и~времени. Искомая зависимость для ряда получившихся суперпозиций легко
+восстанавливается аналитически нахождением обратных формул.
 
 Использованные параметры алгоритма \ref{algo:SA}: $N_{max} = 200, I_{max} = 50,
 \hat{Q} = 0.95, \tau = 10, \alpha = 0.05$. При отсутствии улучшения результатов
@@ -1033,25 +1106,28 @@ $\tau$~--- коэффициент, характеризующий желаему
 	8	& $\displaystyle 0.125 \frac{y}{(y^2)^{0.8+y}}$					& $\approx 0.0171$	& 11	\\ \hline
 	14	& $\displaystyle \frac{\frac{3.86 \cdot 10^{11} + y}{\frac{y\frac{1.227 \cdot 10^{11}}{x^y}-2.46 \cdot 10^{8}}{y \cos \left(\frac{\frac{-5.89 \cdot 10^{-3}+y}{\frac{y - 5.47 \cdot 10^{-3}}{y \cos y}}}{y}\right)}}}{y^y \cos y + xy}$	& $\approx 0.092$	& 42		\\ \hline
   \end{tabular}
-  \label{tabl:results}
   \caption{Результаты вычислительного эксперимента}
+  \label{tabl:results}
 \end{table}
 
-На рисунках \ref{fig:1_iso} и \ref{fig:1_proj} отображены изометрическая
-проекция и проекция на одну из плоскостей для суперпозиции
-$\left(\frac{1.36}{xy}\right)^{0.48}$.
-
 \begin{figure}[h]
-  \includegraphics[scale=0.80,angle=-90]{figs/1-iso.eps}
+  \includegraphics[scale=1.27]{figs/1-iso.eps}
   \caption{Изометрическая проекция результирующей суперпозиции}
   \label{fig:1_iso}
 \end{figure}
 
 \begin{figure}[h]
-  \includegraphics[scale=0.80,angle=-90]{figs/1-proj.eps}
+  \includegraphics[scale=1.27]{figs/1-proj.eps}
   \caption{Проекция результирующей суперпозиции}
   \label{fig:1_proj}
 \end{figure}
+
+В таблице $\ref{fig:expr_tree_res}$ представлены графы
+первых двух упомянутых в таблице суперпозиций. На рисунках \ref{fig:1_iso} и
+\ref{fig:1_proj} отображены изометрическая проекция и проекция на одну из
+плоскостей для суперпозиции $\left(\frac{1.36}{xy}\right)^{0.48}$. 
+
+\FloatBarrier
 
 \section{Заключение}
 
@@ -1077,6 +1153,8 @@ $\left(\frac{1.36}{xy}\right)^{0.48}$.
 Описан стохастический алгоритм индуктивного порождения существенно нелинейных
 суперпозиций и приведены результаты его работы для задачи моделирования
 волатильности опционов.
+
+\FloatBarrier
 
 \bibliographystyle{unsrt}
 \extrasrussian
