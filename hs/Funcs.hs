@@ -25,6 +25,7 @@ unaryOps Tan = tan
 unaryOps Asin = asin
 unaryOps Acos = acos
 unaryOps Atan = atan
+{-# SPECIALIZE unaryOps :: UnaryFunc -> Double -> Double #-}
 
 unaryOpsOnly = [ Sin, Cos, Log, Tan, Asin, Acos, Atan ]
 
@@ -44,6 +45,7 @@ binaryOps Minus = (-)
 binaryOps Mul = (*)
 binaryOps Div = (/)
 binaryOps Pow = (**)
+{-# SPECIALIZE binaryOps :: BinaryFunc -> Double -> Double -> Double #-}
 
 binaryOpsOnly = [ Plus, Minus, Mul, Div, Pow ]
 

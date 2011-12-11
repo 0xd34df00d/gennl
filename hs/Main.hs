@@ -56,7 +56,7 @@ sse = do
 sse' (Left _) = error ":("
 sse' (Right recs) = sse'' $ (read <$>) <$> recs
 
-sse'' recs = sqrt $ sum $ map (\(z:x:y:[]) -> (f x y - z) ** 2) recs
+sse'' recs = sum $ map (\(z:x:y:[]) -> (f x y - z) ** 2) recs
     where f x y = ((3.86e11)/((((1.227e11/(x**y))*y)-2.46e8)/(cos ((((-5.89e-3+y)/((y-5.47e-3)/(cos (y)*y)))/y))*y)))/(cos (y)*((y**y)+(y*x)))
 
 main = do

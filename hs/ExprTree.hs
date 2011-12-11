@@ -25,10 +25,10 @@ import Formattable
 data Var = Var String
     deriving (Show, Eq, Ord)
 
-data ExprTree a = NUn !UnaryFunc !(ExprTree a)
-                | NBin !BinaryFunc !(ExprTree a) !(ExprTree a)
-                | LVar !Var
-                | LC !a
+data ExprTree a = NUn UnaryFunc (ExprTree a)
+                | NBin BinaryFunc (ExprTree a) (ExprTree a)
+                | LVar Var
+                | LC a
     deriving (Show, Eq, Ord)
 
 instance NFData a => NFData (ExprTree a)

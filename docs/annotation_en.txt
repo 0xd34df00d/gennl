@@ -4,3 +4,6 @@ non-linear models. An algorithm to generate all advmissible superpositions of
 given complexity in finite number of iterations is proposed. The proof of its
 correctness is stated. The european option volatility surface illustrates the
 proposed method.
+
+Keywords: symbolic regression, non-linear models, inductive generation,
+options volatility.
