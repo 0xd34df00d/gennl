@@ -1,0 +1,6 @@
+To find an optimal non-linear regression model the author considers a set of
+competitive ones. The paper presents an algorithm which inductively generates
+non-linear models. An algorithm to generate all advmissible superpositions of
+given complexity in finite number of iterations is proposed. The proof of its
+correctness is stated. The european option volatility surface illustrates the
+proposed method.
