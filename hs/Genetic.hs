@@ -14,10 +14,9 @@ import Control.DeepSeq
 import Data.List
 import Data.Maybe
 import Data.Functor ((<$>))
-import Numeric.FAD
 import Debug.Trace
 import Data.Ord (comparing)
-import Random
+import System.Random
 
 import ExprTree
 import SupportUtils
@@ -44,7 +43,7 @@ data RandomGen g => GAState g a = GAState {
         optimized :: [a]
     }
 
-class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (ComputeRes a), RealFloat (ComputeRes a), Formattable (ComputeRes a)) => GAble a where
+class (Eq a, Show a, Storable a, Formattable a, NFData a, NFData (ComputeRes a), Ord (ComputeRes a), RealFloat (ComputeRes a), Formattable (ComputeRes a)) => GAble a where
     type ComputeRes a :: *
     mutate :: RandomGen g => GAState g a -> g -> a -> a
     crossover :: RandomGen g => GAState g a -> g -> (a, a) -> (a, a)
