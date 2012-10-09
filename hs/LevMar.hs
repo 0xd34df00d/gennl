@@ -57,8 +57,8 @@ fitModel' iter λ sse f j (ys, xs) β | iter > 20 || shStop = β
           (iter', sse', λ', β') | ssed <= sse = (iter + 1, ssed, λd, β + δd)
                                 | otherwise = (iter, sse, λu, β)
 
-fitModel :: (GAMX a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> Vector a
-fitModel f j pts b = fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, xv) βv
+fitModel :: (GAMX a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> [a]
+fitModel f j pts b = toList $ fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, xv) βv
     where yv = fromList $ map fst pts
           xv = fromRows $ map (fromList . snd) pts
           βv = fromList b
