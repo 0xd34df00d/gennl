@@ -35,9 +35,9 @@ instance NFData a => NFData (ExprTree a)
 class (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
 instance (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
 
-instance (Show a) => Formattable (ExprTree a) where
+instance (Show a, Formattable a) => Formattable (ExprTree a) where
     pretty (LVar (Var x)) = x
-    pretty (LC c) = show c
+    pretty (LC c) = pretty c
     pretty (NUn f t) = pretty f ++ " (" ++ pretty t ++ ")"
     pretty (NBin f l r) = "(" ++ pretty l ++ pretty f ++ pretty r ++ ")"
 
