@@ -5,9 +5,8 @@ import Control.Arrow
 import Data.List
 import Data.Either
 import Data.Functor ((<$>))
-import Random
+import System.Random
 import Debug.Trace
-import Numeric.FAD
 
 import ExprTree
 import NaturalParser
@@ -15,9 +14,6 @@ import NaturalParser
 import Genetic
 import CSVParser
 import Formattable
-
-instance (Read a, Num a) => Read (Dual tag a) where
-    readsPrec i s = map (first Numeric.FAD.lift) (readsPrec i s)
 
 applyP f s = case s of
         Right t -> Right $ f t
