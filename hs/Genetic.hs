@@ -53,7 +53,7 @@ class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (Comput
     variateConsts :: a -> (a, [(String, ComputeRes a)])
     fixVars :: [(String, ComputeRes a)] -> a -> a
     jacForConsts :: a -> ([String], [String]) -> [ComputeRes a] -> [ComputeRes a] -> [ComputeRes a]
-    complexity :: a -> Double
+    complexity :: a -> ComputeRes a
     complexity _ = 1.0
     simplify :: a -> a
     simplify = id
@@ -139,7 +139,7 @@ getChromoFit a st = 1 / (sum xs + 1) * cpxPen
     where xs = map f (testSet c)
           f smp = sqrt ((snd smp - compute (zip (vars c) (fst smp)) a) ** 2)
           c = cfg st
-          cpxPen = realToFrac $ 0.95 + 0.05 / (1 + (exp 1) ** (complexity a - 10))
+          cpxPen = 0.95 + 0.05 / (1 + (exp 1) ** (complexity a - 10))
 
 clean :: (GAble a, RandomGen g) => (GAState g a -> [a] -> [a]) -> MGState g a
 clean cleaner = do
