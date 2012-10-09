@@ -75,7 +75,7 @@ initGA c g = GAState c g 0 [] [] []
 
 tryAddOne :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 tryAddOne st = execState reassess st'
-    where st' = st { ppl = inst : (ppl st), randGen = g' }
+    where st' = st { ppl = (simplify inst) : (ppl st), randGen = g' }
           (inst, g') = randGAInst (vars c) (rndCpx c) (randGen st)
           c = cfg st
 
