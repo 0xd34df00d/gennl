@@ -105,7 +105,7 @@ optimizePplConsts = do
     st <- get
     let opted = optimized st
     let unopt = ppl st \\ opted
-    let !opt = parListChunk (length unopt `div` 16) rdeepseq `withStrategy` map (optimizeConsts (cfg st)) unopt
+    let !opt = {-parListChunk (length unopt `div` 16) rdeepseq `withStrategy`-} map (optimizeConsts (cfg st)) unopt
     put st { ppl = opted ++ opt, optimized = opted ++ opt, fits = [] } --filter (\x -> fst x `elem` opted) (fits st) }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
@@ -126,7 +126,7 @@ assessPpl :: (GAble a, RandomGen g) => MGState g a
 assessPpl = do
         st <- get
         let ppls = ppl st
-        let !as = parListChunk (length ppls `div` 16) rdeepseq `withStrategy` map (getFit st) ppls
+        let !as = {-parListChunk (length ppls `div` 16) rdeepseq `withStrategy`-} map (getFit st) ppls
         put st { fits = zip ppls as }
     where getFit st a | Just x <- lookup a (fits st) = x
                       | otherwise = getChromoFit a st
