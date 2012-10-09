@@ -53,22 +53,22 @@ fitModel' iter λ sse f j (ys, xs) β | iter > 20 || shStop = β
           v = 5.5
           (λd, λu) = (λ / v, λ * v)
           ssed = modelSSE f (ys, xs) (β + δd)
-          δd = inv (js + mapMatrix (* λd) (diag $ takeDiag js)) <> jmt <> (ys - vecFun f (β, xs))
+          δd = pinv (js + mapMatrix (* λd) (diag $ takeDiag js)) <> jmt <> (ys - vecFun f (β, xs))
           (iter', sse', λ', β') | ssed <= sse = (iter + 1, ssed, λd, β + δd)
                                 | otherwise = (iter, sse, λu, β)
 
 fitModel :: (GAMX a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> [a]
-fitModel f j pts b = toList $ fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, xv) βv
+fitModel f j pts β = toList $ fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, xv) βv
     where yv = fromList $ map fst pts
           xv = fromRows $ map (fromList . snd) pts
-          βv = fromList b
+          βv = fromList β
           sse = modelSSE (f2v f) (yv, xv) βv
 
 f1 :: Floating a => Model a
 f1 (a:b:c:[], x:y:[]) = a * x + b * y + c * y * sin x
 
 j1 :: (Real a, Fractional a, Floating a) => Jacob a
-j1 ((a:b:c:[]), (x:y:[])) = [x, y, y * sin x]--[a + c * y * cos x, b + c * sin x]
+j1 ((a:b:c:[]), (x:y:[])) = [x, y, y * sin x]
 
 xs = [[x, y] | x <- [0.0 .. 5.0], y <- [0.0 .. 5.0]]
 ys = map (\x -> f1 ([4, 5, 2], x)) xs
