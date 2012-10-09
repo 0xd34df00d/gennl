@@ -109,7 +109,7 @@ optimizePplConsts = do
     let opted = optimized st
     let unopt = ppl st \\ opted
     let !opt = {-parListChunk (length unopt `div` 16) rdeepseq `withStrategy`-} map (optimizeConsts (cfg st)) unopt
-    put st { ppl = opted ++ opt, optimized = opted ++ opt, fits = [] } --filter (\x -> fst x `elem` opted) (fits st) }
+    put st { ppl = opted ++ opt, optimized = opted ++ opt, fits = filter (\x -> fst x `elem` opted) (fits st) }
 
 runOpt :: (GAble a) => [String] -> [([ComputeRes a], ComputeRes a)] -> [(String, ComputeRes a)] -> a -> [ComputeRes a]
 runOpt vars dat cv a = LevMar.fitModel (gaModel (a, cvNames ++ vars)) j (map (\(a, b) -> (b, a)) dat) (map snd cv)
