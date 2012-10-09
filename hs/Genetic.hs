@@ -55,10 +55,6 @@ class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (Comput
     jacForConsts :: a -> ([String], [String]) -> [ComputeRes a] -> [ComputeRes a] -> [ComputeRes a]
     complexity :: a -> Double
     complexity _ = 1.0
-    res2double :: ComputeRes a -> Double
-    res2double = realToFrac
-    double2res :: Double -> ComputeRes a
-    double2res = realToFrac
     simplify :: a -> a
     simplify = id
     isSameStruct :: a -> a -> Bool
