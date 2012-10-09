@@ -73,10 +73,15 @@ defConfig = GAConfig
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
 initGA c g = GAState c g 0 [] [] []
 
-initPpl :: (RandomGen g, GAble a) => Int -> GAState g a -> GAState g a
-initPpl n st = st { ppl = map simplify $ take n $ unfoldr (Just . randGAInst (vars c) (rndCpx c)) g1, randGen = g2 }
-    where (g1, g2) = split $ randGen st
+tryAddOne :: (RandomGen g, GAble a) => GAState g a -> GAState g a
+tryAddOne st = execState reassess st'
+    where st' = st { ppl = inst : (ppl st), randGen = g' }
+          (inst, g') = randGAInst (vars c) (rndCpx c) (randGen st)
           c = cfg st
+
+initPpl :: (RandomGen g, GAble a) => Int -> GAState g a -> GAState g a
+initPpl n st | length (ppl st) < n = initPpl n $ tryAddOne st
+             | otherwise = st
 
 iterateGA :: (RandomGen g, GAble a) => GAState g a -> GAState g a
 iterateGA = execState chain
