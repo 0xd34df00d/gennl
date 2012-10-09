@@ -86,12 +86,14 @@ iterateGA = execState chain
                     mutateSome >>
                     crossoverSome >>
                     reassess
-          reassess = assessPpl >>
-                    clean nanF >>
-                    sortPpl >>
-                    clean sameF
 
 type MGState g a = State (GAState g a) ()
+
+reassess :: (GAble a, RandomGen g) => MGState g a
+reassess = assessPpl >>
+           clean nanF >>
+           sortPpl >>
+           clean sameF
 
 tickGA :: (GAble a, RandomGen g) => MGState g a
 tickGA = get >>= (\st -> (iter st + 1, length $ ppl st, map pretty (drop (length (fits st) - 5) (fits st))) `traceShow` put $ st { iter = iter st + 1 } )
