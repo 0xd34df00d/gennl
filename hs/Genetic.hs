@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DatatypeContexts #-}
 
 module Genetic
     where
@@ -34,7 +35,7 @@ data GAConfig a = GAConfig {
         stopF :: [a] -> Int -> ComputeRes a -> Bool
     }
 
-data RandomGen g => GAState g a = GAState {
+data (RandomGen g) => GAState g a = GAState {
         cfg :: GAConfig a,
         randGen :: g,
         iter :: Int,
@@ -43,7 +44,7 @@ data RandomGen g => GAState g a = GAState {
         optimized :: [a]
     }
 
-class (Eq a, Show a, Storable a, Formattable a, NFData a, NFData (ComputeRes a), Ord (ComputeRes a), RealFloat (ComputeRes a), Formattable (ComputeRes a)) => GAble a where
+class (Eq a, Show a, Formattable a, NFData a, NFData (ComputeRes a), Ord (ComputeRes a), RealFloat (ComputeRes a), Formattable (ComputeRes a), LevMar.GAMX (ComputeRes a)) => GAble a where
     type ComputeRes a :: *
     mutate :: RandomGen g => GAState g a -> g -> a -> a
     crossover :: RandomGen g => GAState g a -> g -> (a, a) -> (a, a)
@@ -195,7 +196,7 @@ runGA st | stopF (cfg st') (ppl st') (iter st') maxFitness = (best, maxFitness, 
     where st' = iterateGA st
           (best, maxFitness) = maximumBy (comparing snd) (filter (not . isNaN . snd) (fits st'))
 
-instance (SuitableConst a, Num a, Real a, NFData a, Floating a, Formattable a, RealFloat a) => GAble (ExprTree a) where
+instance (SuitableConst a, Num a, Real a, NFData a, Floating a, Formattable a, RealFloat a, LevMar.GAMX a) => GAble (ExprTree a) where
     type ComputeRes (ExprTree a) = a
     mutate = mutateTree
     crossover = coTrees
