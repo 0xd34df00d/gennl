@@ -13,9 +13,8 @@ import Control.DeepSeq
 import Control.Monad
 import Control.Arrow
 import Data.Functor ((<$>))
-import Random
+import System.Random
 import Data.List
-import Numeric.FAD
 import Debug.Trace
 
 import SupportUtils
@@ -34,24 +33,12 @@ data ExprTree a = NUn UnaryFunc (ExprTree a)
 instance NFData a => NFData (ExprTree a)
 
 class (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
-instance (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
 
 instance (Show a) => Formattable (ExprTree a) where
     pretty (LVar (Var x)) = x
     pretty (LC c) = show c
     pretty (NUn f t) = pretty f ++ " (" ++ pretty t ++ ")"
     pretty (NBin f l r) = "(" ++ pretty l ++ pretty f ++ pretty r ++ ")"
-
-intLeaf = LC . fromInteger
-realLeaf = LC
-
-varLeaf = LVar . Var
-
-unaryNode s = NUn <$> lookup s al 
-    where al = [ ("sin", Sin), ("cos", Cos), ("log", Log), ("tan", Tan), ("atan", Atan), ("asin", Asin), ("acos", Acos) ]
-
-binaryNode s = NBin <$> lookup s al
-    where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
 
 randExprTree :: (RandomGen g, SuitableConst a) => [String] -> Int -> g -> (ExprTree a, g)
 randExprTree vars cpx g = randExprTree' vars g (0, cpx)
@@ -68,7 +55,7 @@ randExprTree' vars g (dh, cpx) | dh /= 0 && thr dice 0.01 0.30 = "CONST" `traceS
                                                     (randElem unaryOpsOnly g2)
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx)),
                                                  g5)
-    where (dice, _) = random g1
+    where dice = (fst $ random g1)
           (g0:g1:g2:g3:g4:g5:_) = take 6 (rndGens g)
           randElem xs g = xs !! fst (randomR (0, length xs - 1) g)
           (?) a b c | a = b
