@@ -33,12 +33,24 @@ data ExprTree a = NUn UnaryFunc (ExprTree a)
 instance NFData a => NFData (ExprTree a)
 
 class (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
+instance (Fractional a, Random a, Ord a, Eq a) => SuitableConst a
 
 instance (Show a) => Formattable (ExprTree a) where
     pretty (LVar (Var x)) = x
     pretty (LC c) = show c
     pretty (NUn f t) = pretty f ++ " (" ++ pretty t ++ ")"
     pretty (NBin f l r) = "(" ++ pretty l ++ pretty f ++ pretty r ++ ")"
+
+intLeaf = LC . fromInteger
+realLeaf = LC
+
+varLeaf = LVar . Var
+
+unaryNode s = NUn <$> lookup s al 
+    where al = [ ("sin", Sin), ("cos", Cos), ("log", Log), ("tan", Tan), ("atan", Atan), ("asin", Asin), ("acos", Acos) ]
+
+binaryNode s = NBin <$> lookup s al
+    where al = [ ("+", Plus), ("-", Minus), ("*", Mul), ("/", Div), ("^", Pow)]
 
 randExprTree :: (RandomGen g, SuitableConst a) => [String] -> Int -> g -> (ExprTree a, g)
 randExprTree vars cpx g = randExprTree' vars g (0, cpx)
