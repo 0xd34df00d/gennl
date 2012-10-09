@@ -173,7 +173,7 @@ mutateSome :: (RandomGen g, GAble a) => MGState g a
 mutateSome = do
         st <- get
         let ppls = ppl st
-        let toTake = length ppls `div` 3
+        let toTake = 2 * length ppls `div` 3
         let gs = rndGens $ randGen st
         let news = zipWith (mutate st) gs (take toTake ppls)
         put st { ppl = news ++ ppls, randGen = gs !! toTake }
@@ -184,7 +184,7 @@ crossoverSome = do
         unless (1 `elem` map snd (fits st)) $ do
             let ppls = ppl st
             let l = length ppls
-            let rest = lastN (min 7 (l `div` 3)) ppls
+            let rest = lastN (20) ppls
             let gs = rndGens $ randGen st
             let pairs = ns [ (m1, m2) | m1 <- rest, m2 <- takeWhile (/= m1) rest ]
             let news = ns $ withStrategy rseq $ zipWith (crossover st) gs pairs
