@@ -3,7 +3,6 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DatatypeContexts #-}
 
 module Genetic
     where
@@ -35,7 +34,7 @@ data GAConfig a = GAConfig {
         stopF :: [a] -> Int -> ComputeRes a -> Bool
     }
 
-data (RandomGen g) => GAState g a = GAState {
+data GAState g a = GAState {
         cfg :: GAConfig a,
         randGen :: g,
         iter :: Int,
