@@ -72,10 +72,13 @@ defConfig = GAConfig
 initGA :: (RandomGen g, GAble a) => GAConfig a -> g -> GAState g a
 initGA c g = GAState c g 0 [] [] []
 
+isNewInst :: (GAble a) => [a] -> a -> Bool
+isNewInst ppls inst = not $ (isSameStruct inst) `any` ppls
+
 tryAddOne :: (RandomGen g, GAble a) => GAState g a -> GAState g a
-tryAddOne st = execState reassess st'
-    where st' = st { ppl = (simplify inst) : (ppl st), randGen = g' }
-          (inst, g') = randGAInst (vars c) (rndCpx c) (randGen st)
+tryAddOne st | isNewInst (ppl st) inst = execState reassess $ st { ppl = inst : (ppl st), randGen = g' }
+             | otherwise = st { randGen = g' }
+    where (inst, g') = simplify *** id $ randGAInst (vars c) (rndCpx c) (randGen st)
           c = cfg st
 
 initPpl :: (RandomGen g, GAble a) => Int -> GAState g a -> GAState g a
@@ -96,8 +99,7 @@ type MGState g a = State (GAState g a) ()
 reassess :: (GAble a, RandomGen g) => MGState g a
 reassess = assessPpl >>
            clean nanF >>
-           sortPpl >>
-           clean sameF
+           sortPpl
 
 tickGA :: (GAble a, RandomGen g) => MGState g a
 tickGA = get >>= (\st -> (iter st + 1, length $ ppl st, map pretty (drop (length (fits st) - 5) (fits st))) `traceShow` put $ st { iter = iter st + 1 } )
@@ -140,21 +142,14 @@ getChromoFit a st = 1 / (sum xs + 1) * cpxPen
           c = cfg st
           cpxPen = 0.95 + 0.05 / (1 + (exp 1) ** (complexity a - 10))
 
-clean :: (GAble a, RandomGen g) => (GAState g a -> [a] -> [a]) -> MGState g a
+clean :: (GAble a, RandomGen g) => (GAState g a -> [a]) -> MGState g a
 clean cleaner = do
         st <- get
-        let ppls' = cleaner st (ppl st)
-        let ppls = drop (diff ppls' st) ppls'
-        let rem = ppl st \\ ppls
-        put st { ppl = ppls, fits = filter (not . (`elem` rem) . fst) (fits st) }
-            where diff p st = length p - optNum (cfg st)
+        let toRemove = cleaner st
+        put st { ppl = ppl st \\ toRemove, fits = filter (not . (`elem` toRemove) . fst) (fits st) }
 
-nanF :: (RandomGen g, GAble a) => GAState g a -> [a] -> [a]
-nanF st = {-("FITS", map snd $ fits st) `traceShow`-} filter (\a -> not $ isNaN $ fromMaybe (0/0) (liftM snd $ find (isSameStruct a . fst) (fits st)))
-
-sameF :: (RandomGen g, GAble a) => GAState g a -> [a] -> [a]
-sameF st = reverse . delConseq (\a b -> lookup a fs == lookup b fs || isSameStruct a b) . reverse
-    where fs = fits st
+nanF :: (RandomGen g, GAble a) => GAState g a -> [a]
+nanF st = map fst $ filter (\f -> isNaN $ snd f) (fits st)
 
 delConseq :: (a -> a -> Bool) -> [a] -> [a]
 delConseq _ [] = []
@@ -186,9 +181,10 @@ crossoverSome = do
             let rest = lastN (20) ppls
             let gs = rndGens $ randGen st
             let pairs = ns [ (m1, m2) | m1 <- rest, m2 <- takeWhile (/= m1) rest ]
-            let news = ns $ withStrategy rseq $ zipWith (crossover st) gs pairs
+            let allSimpl = map simplify $ concatMap (\(x, y) -> [x, y]) $ zipWith (crossover st) gs pairs
+            let news = filter (isNewInst ppls) $ nubBy isSameStruct allSimpl
             let nl = length news
-            put st { ppl = ppls ++ concatMap (\(x, y) -> [x, y]) news, randGen = gs !! nl }
+            put st { ppl = ppls ++ news, randGen = gs !! nl }
                 where ns = filter (uncurry (/=))
                       lastN n xs = drop (length xs - n) xs
 
