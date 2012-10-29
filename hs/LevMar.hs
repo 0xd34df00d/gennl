@@ -48,12 +48,12 @@ fitModel' iter λ sse f j (ys, xs) β | iter > 20 || shStop = β
           jmt = trans jm
           js = jmt <> jm
           dβ = β - β'
-          shStop | iter' > iter = sqrt (dβ <.> dβ) < min 0.0001 (β <.> β / 50) || isInfinite sse || isInfinite ssed
+          shStop | iter' > iter = sqrt (dβ <.> dβ) < min 0.0001 (β <.> β / 100) || isInfinite sse || isInfinite ssed
                  | otherwise = λ > 1e9 || isInfinite sse || isInfinite ssed
           v = 5.5
           (λd, λu) = (λ / v, λ * v)
           ssed = modelSSE f (ys, xs) (β + δd)
-          δd = pinv (js + mapMatrix (* λd) (diag $ takeDiag js)) <> jmt <> (ys - vecFun f (β, xs))
+          δd = (fst $ invlndet (js + mapMatrix (* λd) (diag $ takeDiag js))) <> jmt <> (ys - vecFun f (β, xs))
           (iter', sse', λ', β') | ssed <= sse = (iter + 1, ssed, λd, β + δd)
                                 | otherwise = (iter, sse, λu, β)
 
@@ -64,11 +64,20 @@ fitModel f j pts β = toList $ fitModel' 0 0.01 sse (f2v f) (j2v j) (yv, xv) βv
           βv = fromList β
           sse = modelSSE (f2v f) (yv, xv) βv
 
+{-
+ - This one segfaults ghci.
+fitModel :: (GAMX a) => Model a -> Jacob a -> [(a, [a])] -> [a] -> [a]
+fitModel f j pts β = map realToFrac $ fst $ GSLF.fitModel 0.0001 0.01 20 (f', j') pts' (map realToFrac β)
+    where f' = \a b -> [realToFrac $ f (map realToFrac a, b)]
+          j' = \a b -> [map realToFrac $ j (map realToFrac a, map realToFrac b)]
+          pts' = map (\(y, xs) -> (map realToFrac xs, [realToFrac y])) pts
+          -}
+
 f1 :: Floating a => Model a
-f1 (a:b:c:[], x:y:[]) = a * x + b * y + c * y * sin x
+f1 ([a, b, c], [x, y]) = a * x + b * y + c * y * sin x
 
 j1 :: (Real a, Fractional a, Floating a) => Jacob a
-j1 ((a:b:c:[]), (x:y:[])) = [x, y, y * sin x]
+j1 (([a, b, c]), ([x, y])) = [x, y, y * sin x]
 
 xs = [[x, y] | x <- [0.0 .. 5.0], y <- [0.0 .. 5.0]]
 ys = map (\x -> f1 ([4, 5, 2], x)) xs

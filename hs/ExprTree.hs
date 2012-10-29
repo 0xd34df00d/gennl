@@ -56,7 +56,7 @@ randExprTree :: (RandomGen g, SuitableConst a) => [String] -> Int -> g -> (ExprT
 randExprTree vars cpx g = randExprTree' vars g (0, cpx)
 
 randExprTree' :: forall a g. (RandomGen g, SuitableConst a) => [String] -> g -> (Int, Int) -> (ExprTree a, g)
-randExprTree' vars g (dh, cpx) | thr dice 0.02 0.30 = (LC (dice * 50), g5)
+randExprTree' vars g (dh, cpx) | thr dice 0.10 0.30 = (LC (dice * 50), g5)
                                | thr dice 0.30 0.30 = (LVar $ Var $ randElem vars g2, g5)
                                | dice <= 0.85 = (NBin
                                                     (randElem binaryOpsOnly g2)
@@ -67,7 +67,7 @@ randExprTree' vars g (dh, cpx) | thr dice 0.02 0.30 = (LC (dice * 50), g5)
                                                     (randElem unaryOpsOnly g2)
                                                     (fst $ randExprTree' vars g3 (dh + 1, cpx)),
                                                  g5)
-    where dice = fst $ randomR (0, 1) g1 :: a
+    where dice = fst $ randomR (0, 0.85) g1 :: a
           (g0:g1:g2:g3:g4:g5:_) = take 6 (rndGens g)
           randElem xs g = xs !! fst (randomR (0, length xs - 1) g)
           (?) a b c | a = b

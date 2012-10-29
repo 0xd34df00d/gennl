@@ -140,7 +140,8 @@ getChromoFit a st = 1 / (sum xs + 1) * cpxPen
     where xs = map f (testSet c)
           f smp = sqrt ((snd smp - compute (zip (vars c) (fst smp)) a) ** 2)
           c = cfg st
-          cpxPen = 0.95 + 0.05 / (1 + (exp 1) ** (complexity a - 10))
+          α = 0
+          cpxPen = (1 - α) + α / (1 + (exp 1) ** (complexity a - 10))
 
 clean :: (GAble a, RandomGen g) => (GAState g a -> [a]) -> MGState g a
 clean cleaner = do
